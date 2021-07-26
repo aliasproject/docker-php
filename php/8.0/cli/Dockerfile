@@ -1,4 +1,5 @@
-FROM ghcr.io/aliasproject/docker-baseimage-s6-overlay-alpine:3.14.0
+FROM alpine:3.14.0
+
 LABEL maintainer="Michael Aguiar <mike@aliasproject.com>"
 
 RUN apk add --update --no-cache \
@@ -10,19 +11,14 @@ RUN apk add --update --no-cache \
 	php8-curl \
 	php8-gd \
 	php8-mbstring \
+	php8-pdo_mysql \
+	php8-mysqli \
 	php8-xml \
 	php8-zip && \
 	ln -s /usr/bin/php8 /usr/bin/php
-	
-	
-# Copy over S6 configurations
-COPY etc/cont-init.d/ /etc/cont-init.d/
 
-# Set the default work directory to our web user
-WORKDIR /var/www/html
-
-# Configure S6 to drop priveleges
-ENTRYPOINT ["/init"]
+# Set default work directory
+WORKDIR /app
 
 # Run PHP
 CMD ["php", "-a"]

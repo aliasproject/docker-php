@@ -1,0 +1,3 @@
+#!/usr/bin/with-contenv ash
+
+/usr/sbin/php-fpm8 --nodaemonize

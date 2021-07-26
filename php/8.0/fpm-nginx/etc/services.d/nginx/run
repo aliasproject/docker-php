@@ -1,0 +1,3 @@
+#!/usr/bin/with-contenv ash
+
+nginx -g "daemon off;"
