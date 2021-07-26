@@ -18,6 +18,7 @@ COPY etc/nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf
 COPY etc/nginx/server-opts.d /etc/nginx/server-opts.d
 
 # Configure PHP
+COPY etc/php/php-fpm.d/z-fpm-with-overrides.conf /etc/php8/php-fpm.d/z-fpm-with-overrides.conf
 
 # Set the default work directory to our web user
 WORKDIR /app
