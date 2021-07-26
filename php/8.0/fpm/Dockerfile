@@ -29,6 +29,7 @@ RUN apk add --update --no-cache \
     php8-gd \
     php8-mbstring \
     php8-xml \
+    php8-tokenizer \
     php8-zip && \
     ln -s /usr/bin/php8 /usr/bin/php && \
     sed -i -e 's/\[www\]/\[$\{PHP_POOL_NAME\}]/g' /etc/php8/php-fpm.d/www.conf
@@ -40,5 +41,5 @@ COPY etc/cont-init.d/ /etc/cont-init.d/
 # Configure PHP
 COPY etc/php/php-fpm.d/y-override-php-defaults.conf /etc/php8/php-fpm.d/y-override-php-defaults.conf
 
-# Configure S6 to drop priveleges
+# Run S6
 ENTRYPOINT ["/init"]

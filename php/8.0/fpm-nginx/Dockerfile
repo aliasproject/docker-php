@@ -11,7 +11,14 @@ ENV HTTP2=true \
 	PHP_PM_MIN_SPARE_SERVERS="1" \
 	PHP_PM_MAX_SPARE_SERVERS="3"
 
-RUN apk add --update --no-cache nginx && mkdir /var/run/php && chown -R nobody.nobody /app
+# Set the default work directory to our web user
+WORKDIR /app
+
+RUN apk add --update --no-cache nginx && \
+	mkdir /var/run/php && \
+	chown -R nobody.nobody /app && \
+	chown -R nobody.nobody /run && \
+	chown -R nobody.nobody /etc/services.d
 
 # Copy over S6 configurations
 COPY etc/services.d/ /etc/services.d/
@@ -26,8 +33,5 @@ COPY etc/nginx/server-opts.d /etc/nginx/server-opts.d
 # Configure PHP
 COPY etc/php/php-fpm.d/z-fpm-with-overrides.conf /etc/php8/php-fpm.d/z-fpm-with-overrides.conf
 
-# Set the default work directory to our web user
-WORKDIR /app
-
-# Configure S6 to drop priveleges
+# Run S6
 ENTRYPOINT ["/init"]
