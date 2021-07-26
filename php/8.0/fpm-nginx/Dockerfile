@@ -2,10 +2,16 @@ FROM aliasproject/php:8.0-fpm
 
 LABEL maintainer="Michael Aguiar <mike@aliasproject.com>"
 
-ENV HTTP2=true
-ENV PORT=80
+ENV HTTP2=true \
+	PORT=80 \
+	PHP_POOL_NAME="www" \
+	PHP_PM_CONTROL=ondemand \
+	PHP_PM_MAX_CHILDREN="20" \
+	PHP_PM_START_SERVERS="2" \
+	PHP_PM_MIN_SPARE_SERVERS="1" \
+	PHP_PM_MAX_SPARE_SERVERS="3"
 
-RUN apk add --update --no-cache nginx
+RUN apk add --update --no-cache nginx && mkdir /var/run/php && chown -R nobody.nobody /app
 
 # Copy over S6 configurations
 COPY etc/services.d/ /etc/services.d/
