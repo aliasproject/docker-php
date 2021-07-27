@@ -1,0 +1,4 @@
+#!/usr/bin/with-contenv ash
+
+# Start NGINX
+nginx

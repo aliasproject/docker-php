@@ -1,0 +1,4 @@
+#!/usr/bin/with-contenv ash
+
+# Start PHP-FPM
+/usr/sbin/php-fpm7 --nodaemonize

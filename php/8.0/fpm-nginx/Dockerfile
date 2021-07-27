@@ -1,24 +1,20 @@
-FROM aliasproject/php:8.0-fpm
+FROM ghcr.io/aliasproject/php:8.0-fpm
 
 LABEL maintainer="Michael Aguiar <mike@aliasproject.com>"
 
 ENV HTTP2=true \
 	PORT=80 \
 	PHP_POOL_NAME="www" \
-	PHP_PM_CONTROL=ondemand \
+	PHP_PM_CONTROL="ondemand" \
 	PHP_PM_MAX_CHILDREN="20" \
 	PHP_PM_START_SERVERS="2" \
 	PHP_PM_MIN_SPARE_SERVERS="1" \
 	PHP_PM_MAX_SPARE_SERVERS="3"
 
-# Set the default work directory to our web user
-WORKDIR /app
-
 RUN apk add --update --no-cache nginx && \
 	mkdir /var/run/php && \
-	chown -R nobody.nobody /app && \
-	chown -R nobody.nobody /run && \
-	chown -R nobody.nobody /etc/services.d
+	chown -R nobody.nobody /var/lib/nginx && \
+	chown -R nobody.nobody /var/log/nginx
 
 # Copy over S6 configurations
 COPY etc/services.d/ /etc/services.d/

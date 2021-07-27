@@ -17,22 +17,23 @@ ENV PHP_DATE_TIMEZONE="UTC" \
     PHP_PM_MIN_SPARE_SERVERS="1" \
     PHP_PM_MAX_SPARE_SERVERS="3"
 
-##
+# Install packages
 RUN apk add --update --no-cache \
-    ca-certificates \
     curl \
-    unzip \
     php8 \
     php8-fpm \
     php8-common \
     php8-curl \
     php8-gd \
     php8-mbstring \
+    php8-opcache \
     php8-xml \
     php8-tokenizer \
     php8-zip && \
     ln -s /usr/bin/php8 /usr/bin/php && \
-    sed -i -e 's/\[www\]/\[$\{PHP_POOL_NAME\}]/g' /etc/php8/php-fpm.d/www.conf
+    sed -i -e 's/\[www\]/\[$\{PHP_POOL_NAME\}]/g' /etc/php8/php-fpm.d/www.conf && \
+    mkdir /app && \
+    chown -R nobody.nobody /app
 
 # Copy over S6 configurations
 COPY etc/services.d/ /etc/services.d/
@@ -40,6 +41,9 @@ COPY etc/cont-init.d/ /etc/cont-init.d/
 
 # Configure PHP
 COPY etc/php/php-fpm.d/y-override-php-defaults.conf /etc/php8/php-fpm.d/y-override-php-defaults.conf
+
+# Set the default work directory to our web user
+WORKDIR /app
 
 # Run S6
 ENTRYPOINT ["/init"]
