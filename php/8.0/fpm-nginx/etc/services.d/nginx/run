@@ -1,4 +1,12 @@
 #!/usr/bin/with-contenv ash
 
+# Set Port
+if [ $HTTP2 == "true" ]
+then
+    sed -i -r "s/80 default_server;/${PORT} default_server http2;/g" /etc/nginx/conf.d/default.conf
+else
+    sed -i -r "s/80 default_server;/${PORT} default_server;/g" /etc/nginx/conf.d/default.conf
+fi
+
 # Start NGINX
 nginx
