@@ -8,5 +8,8 @@ else
     sed -i -r "s/80 default_server;/${PORT} default_server;/g" /etc/nginx/conf.d/default.conf
 fi
 
+# Wait until PHP-FPM is ready
+while [ ! -S /var/run/php/php-fpm.sock ]; do sleep 1; done
+
 # Start NGINX
 nginx
