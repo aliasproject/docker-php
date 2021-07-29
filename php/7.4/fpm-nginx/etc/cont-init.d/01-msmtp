@@ -1,0 +1,12 @@
+#!/usr/bin/with-contenv ash
+
+# Configure PHP to use MSMTP
+sed -i -r 's|;sendmail_path =*|sendmail_path = "/usr/bin/msmtp -t"|g' /etc/php7/php.ini
+
+# Configure MSMTP
+sed -i -r "s/^host .*$/host ${MSMTP_RELAY_SERVER_HOST:-"mailhog"}/g" /etc/msmtprc
+sed -i -r "s/^port .*$/port ${MSMTP_RELAY_SERVER_PORT:-"1025"}/g" /etc/msmtprc
+sed -i -r "s/^auth .*$/auth ${MSMTP_RELAY_SERVER_AUTH:-"on"}/g" /etc/msmtprc
+sed -i -r "s/^user .*$/user ${MSMTP_RELAY_SERVER_USER}/g" /etc/msmtprc
+sed -i -r "s/^password .*$/password ${MSMTP_RELAY_SERVER_PASSWORD}/g" /etc/msmtprc
+sed -i -r "s/^from .*$/from ${MSMTP_RELAY_SERVER_FROM}/g" /etc/msmtprc

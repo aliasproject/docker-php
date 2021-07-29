@@ -4,6 +4,12 @@ LABEL maintainer="Michael Aguiar <mike@aliasproject.com>"
 
 ENV HTTP2=true \
 	PORT=80 \
+	MSMTP_RELAY_SERVER_HOST= \
+	MSMTP_RELAY_SERVER_PORT= \
+	MSMTP_RELAY_SERVER_AUTH= \
+	MSMTP_RELAY_SERVER_USER= \
+	MSMTP_RELAY_SERVER_PASSWORD= \
+	MSMTP_RELAY_SERVER_FROM= \
 	PHP_POOL_NAME="www" \
 	PHP_PM_CONTROL="ondemand" \
 	PHP_PM_MAX_CHILDREN="20" \
@@ -11,7 +17,7 @@ ENV HTTP2=true \
 	PHP_PM_MIN_SPARE_SERVERS="1" \
 	PHP_PM_MAX_SPARE_SERVERS="3"
 
-RUN apk add --update --no-cache nginx && \
+RUN apk add --update --no-cache nginx msmtp && \
 	mkdir /var/run/php && \
 	chown -R nobody.nobody /var/lib/nginx && \
 	chown -R nobody.nobody /var/log/nginx
@@ -25,6 +31,9 @@ COPY etc/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY etc/nginx/php_fastcgi.conf /etc/nginx/php_fastcgi.conf
 COPY etc/nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf
 COPY etc/nginx/server-opts.d /etc/nginx/server-opts.d
+
+# Configure MSMTP
+COPY etc/msmtprc /etc/msmtprc
 
 # Configure PHP
 COPY etc/php/php-fpm.d/z-fpm-with-overrides.conf /etc/php7/php-fpm.d/z-fpm-with-overrides.conf
