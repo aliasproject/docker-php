@@ -33,6 +33,9 @@ RUN apk add --update --no-cache \
     php7-simplexml \
     php7-iconv \
     php7-dom \
+    php7-bcmath \
+    php7-openssl \
+    php7-ctype \
     php7-xmlwriter \
     php7-fileinfo \
     php7-xml \

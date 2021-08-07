@@ -31,6 +31,9 @@ RUN apk add --update --no-cache \
     php8-session \
     php8-opcache \
     php8-xml \
+    php8-openssl \
+    php8-bcmath \
+    php8-ctype \
     php8-simplexml \
     php8-iconv \
     php8-dom \
