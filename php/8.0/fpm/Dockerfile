@@ -26,8 +26,17 @@ RUN apk add --update --no-cache \
     php8-curl \
     php8-gd \
     php8-mbstring \
+    php8-pdo_mysql \
+    php8-mysqli \
+    php8-session \
     php8-opcache \
     php8-xml \
+    php8-simplexml \
+    php8-iconv \
+    php8-dom \
+    php8-json \
+    php8-xmlwriter \
+    php8-fileinfo \
     php8-tokenizer \
     php8-zip && \
     ln -s /usr/bin/php8 /usr/bin/php && \
