@@ -28,6 +28,8 @@ RUN apk add --update --no-cache \
     php7-mbstring \
     php7-opcache \
     php7-xml \
+    php7-json \
+    php7-mysqli \
     php7-tokenizer \
     php7-zip && \
     sed -i -e 's/\[www\]/\[$\{PHP_POOL_NAME\}]/g' /etc/php7/php-fpm.d/www.conf && \

@@ -9,6 +9,8 @@ RUN apk add --update --no-cache \
 	php7-common \
 	php7-curl \
 	php7-gd \
+	php7-json \
+	php7-mysqli \
 	php7-mbstring \
 	php7-opcache \
 	php7-xml \
