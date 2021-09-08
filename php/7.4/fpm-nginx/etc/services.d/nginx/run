@@ -1,7 +1,7 @@
 #!/usr/bin/with-contenv ash
 
 # Wait until PHP-FPM is ready
-while [ ! -S /var/run/php/php-fpm.sock ]; do sleep 1; done
+# while [ ! -S /var/run/php/php-fpm.sock ]; do sleep 1; done
 
 # Start NGINX
 nginx
