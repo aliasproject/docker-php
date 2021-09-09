@@ -26,6 +26,7 @@ RUN apk add --update --no-cache \
     php8-curl \
     php8-gd \
     php8-exif \
+    php8-pecl-imagick \
     php8-mbstring \
     php8-pdo_mysql \
     php8-mysqli \
