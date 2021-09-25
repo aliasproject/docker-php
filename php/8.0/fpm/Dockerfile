@@ -40,6 +40,7 @@ RUN apk add --update --no-cache \
     php8-iconv \
     php8-dom \
     php8-json \
+    php8-phar \
     php8-xmlwriter \
     php8-fileinfo \
     php8-tokenizer \

@@ -42,6 +42,7 @@ RUN apk add --update --no-cache \
     php7-fileinfo \
     php7-xml \
     php7-json \
+    php7-phar \
     php7-tokenizer \
     php7-zip && \
     sed -i -e 's/\[www\]/\[$\{PHP_POOL_NAME\}]/g' /etc/php7/php-fpm.d/www.conf && \
