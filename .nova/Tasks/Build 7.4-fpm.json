@@ -2,7 +2,7 @@
   "actions" : {
     "build" : {
       "enabled" : true,
-      "script" : "#!\/bin\/sh\n\n# Build Image\ndocker build -t aliasproject\/php:7.4-fpm php\/7.4\/fpm\n\n# Tag Image\ndocker tag aliasproject\/php:7.4-fpm ghcr.io\/aliasproject\/php:7.4-fpm\n\n# Build multiple architectures and push\ndocker buildx build --platform linux\/arm64,linux\/amd64 --push -t ghcr.io\/aliasproject\/php:7.4-fpm php\/7.4\/fpm"
+      "script" : "#!\/bin\/sh\n\n# Build Image\ndocker build -t aliasproject\/php:7.4-fpm php\/7.4\/fpm\n\n# Tag Image\ndocker tag aliasproject\/php:7.4-fpm ghcr.io\/aliasproject\/php:7.4-fpm\n\n# Build multiple architectures and push\ndocker buildx build --platform linux\/arm64\/v8,linux\/amd64 --push -t ghcr.io\/aliasproject\/php:7.4-fpm php\/7.4\/fpm"
     }
   },
   "identifier" : "950FD441-89BA-4E82-8576-62CF5F57C1CF",

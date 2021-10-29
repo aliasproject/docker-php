@@ -2,7 +2,7 @@
   "actions" : {
     "build" : {
       "enabled" : true,
-      "script" : "#!\/bin\/sh\n\n# Build Image\ndocker build -t aliasproject\/php:8.0-fpm-nginx php\/8.0\/fpm-nginx\n\n# Build multiple architectures and push\ndocker buildx build --platform linux\/arm64,linux\/amd64 --push -t ghcr.io\/aliasproject\/php:8.0-fpm-nginx php\/8.0\/fpm-nginx\n\n# Build for adm64 and push to alias-cloud\ndocker buildx build --platform linux\/amd64 --push -t gcr.io\/alias-cloud\/php:8.0-fpm-nginx php\/8.0\/fpm-nginx\n\n# Build for amd64 and push to alias-project-corp\ndocker buildx build --platform linux\/amd64 --push -t gcr.io\/alias-project-corp\/php:8.0-fpm-nginx php\/8.0\/fpm-nginx"
+      "script" : "#!\/bin\/sh\n\n# Build Image\ndocker build -t aliasproject\/php:8.0-fpm-nginx php\/8.0\/fpm-nginx\n\n# Build multiple architectures and push\ndocker buildx build --platform linux\/arm64\/v8,linux\/amd64 --push -t ghcr.io\/aliasproject\/php:8.0-fpm-nginx php\/8.0\/fpm-nginx\n\n# Build for adm64 and push to alias-cloud\ndocker buildx build --platform linux\/amd64 --push -t gcr.io\/alias-cloud\/php:8.0-fpm-nginx php\/8.0\/fpm-nginx\n\n# Build for amd64 and push to alias-project-corp\ndocker buildx build --platform linux\/amd64 --push -t gcr.io\/alias-project-corp\/php:8.0-fpm-nginx php\/8.0\/fpm-nginx\n\n# Build for amd64 and push to tmg-ventures\ndocker buildx build --platform linux\/amd64 --push -t gcr.io\/tmg-ventures\/php:8.0-fpm-nginx php\/8.0\/fpm-nginx"
     }
   },
   "identifier" : "37CE458B-B46E-4F24-8AEB-3CAA3D32A603",
