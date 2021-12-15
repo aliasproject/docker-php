@@ -1,4 +1,4 @@
-FROM ghcr.io/aliasproject/docker-baseimage-s6-overlay-alpine:3.14.0
+FROM ghcr.io/aliasproject/docker-baseimage-s6-overlay-alpine:3.15.0
 
 LABEL maintainer="Michael Aguiar <mike@aliasproject.com>"
 
@@ -47,7 +47,8 @@ RUN apk add --update --no-cache \
     php7-zip && \
     sed -i -e 's/\[www\]/\[$\{PHP_POOL_NAME\}]/g' /etc/php7/php-fpm.d/www.conf && \
     mkdir /app && \
-    chown -R nobody.nobody /app
+    addgroup -S alias && adduser -S alias -G alias && \
+    chown -R alias.alias /app
 
 # Copy over S6 configurations
 COPY etc/services.d/ /etc/services.d/

@@ -19,8 +19,8 @@ ENV HTTP2=true \
 
 RUN apk add --update --no-cache nginx msmtp && \
 	mkdir /var/run/php && \
-	chown -R nobody.nobody /var/lib/nginx && \
-	chown -R nobody.nobody /var/log/nginx
+	chown -R alias.alias /var/lib/nginx && \
+	chown -R alias.alias /var/log/nginx
 
 # Copy over S6 configurations
 COPY etc/services.d/ /etc/services.d/
