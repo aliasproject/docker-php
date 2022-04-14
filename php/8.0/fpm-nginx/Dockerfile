@@ -17,14 +17,15 @@ ENV HTTP2=true \
 	PHP_PM_MIN_SPARE_SERVERS="1" \
 	PHP_PM_MAX_SPARE_SERVERS="3"
 
+# Copy over S6 configurations
+COPY etc/s6-rc.d/ /etc/s6-overlay/s6-rc.d
+COPY etc/scripts /etc/s6-overlay/scripts
+	
 RUN apk add --update --no-cache nginx msmtp && \
 	mkdir /var/run/php && \
+	chmod u+x -R /etc/s6-overlay/scripts && \
 	chown -R alias.alias /var/lib/nginx && \
 	chown -R alias.alias /var/log/nginx
-
-# Copy over S6 configurations
-COPY etc/services.d/ /etc/services.d/
-COPY etc/cont-init.d/ /etc/cont-init.d/
 
 # Configure NGINX
 COPY etc/nginx/nginx.conf /etc/nginx/nginx.conf

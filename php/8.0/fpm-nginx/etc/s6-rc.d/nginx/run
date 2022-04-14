@@ -1,4 +1,4 @@
-#!/usr/bin/with-contenv ash
+#!/command/with-contenv ash
 
 # Set Port
 if [ $HTTP2 == "true" ]
@@ -7,3 +7,9 @@ then
 else
     sed -i -r "s/80 default_server;/${PORT} default_server;/g" /etc/nginx/conf.d/default.conf
 fi
+
+# Wait until PHP-FPM is ready
+while ! netstat -tna | grep 'LISTEN\>' | grep -q ':9000\>'; do sleep 0.1; done
+
+# Start NGINX
+nginx

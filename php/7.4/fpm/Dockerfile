@@ -41,6 +41,7 @@ RUN apk add --update --no-cache \
     php7-xmlwriter \
     php7-fileinfo \
     php7-xml \
+    php7-xmlreader \
     php7-json \
     php7-phar \
     php7-tokenizer \
@@ -51,8 +52,7 @@ RUN apk add --update --no-cache \
     chown -R alias.alias /app
 
 # Copy over S6 configurations
-COPY etc/services.d/ /etc/services.d/
-COPY etc/cont-init.d/ /etc/cont-init.d/
+COPY etc/s6-rc.d/ /etc/s6-overlay/s6-rc.d
 
 # Configure PHP
 COPY etc/php/php-fpm.d/y-override-php-defaults.conf /etc/php7/php-fpm.d/y-override-php-defaults.conf

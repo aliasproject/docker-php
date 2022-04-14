@@ -33,6 +33,7 @@ RUN apk add --update --no-cache \
     php8-session \
     php8-opcache \
     php8-xml \
+    php8-xmlreader \
     php8-openssl \
     php8-bcmath \
     php8-ctype \
@@ -53,8 +54,7 @@ RUN apk add --update --no-cache \
     chown -R alias.alias /app
 
 # Copy over S6 configurations
-COPY etc/services.d/ /etc/services.d/
-COPY etc/cont-init.d/ /etc/cont-init.d/
+COPY etc/s6-rc.d/ /etc/s6-overlay/s6-rc.d
 
 # Configure PHP
 COPY etc/php/php-fpm.d/y-override-php-defaults.conf /etc/php8/php-fpm.d/y-override-php-defaults.conf
