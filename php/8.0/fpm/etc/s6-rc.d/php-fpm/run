@@ -2,3 +2,4 @@
 
 # Start PHP-FPM
 /usr/sbin/php-fpm8 --nodaemonize
+
