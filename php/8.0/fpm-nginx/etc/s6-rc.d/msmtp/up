@@ -1,1 +1,2 @@
+with-contenv
 ash /etc/s6-overlay/scripts/msmtp-configure

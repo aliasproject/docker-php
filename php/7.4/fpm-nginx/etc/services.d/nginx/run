@@ -1,7 +1,0 @@
-#!/usr/bin/with-contenv ash
-
-# Wait until PHP-FPM is ready
-while ! netstat -tna | grep 'LISTEN\>' | grep -q ':9000\>'; do sleep 0.1; done
-
-# Start NGINX
-nginx
