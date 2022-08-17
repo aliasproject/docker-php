@@ -20,7 +20,7 @@ ENV HTTP2=true \
 # Copy over S6 configurations
 COPY etc/s6-rc.d/ /etc/s6-overlay/s6-rc.d
 COPY etc/scripts /etc/s6-overlay/scripts
-	
+
 RUN apk add --update --no-cache nginx msmtp && \
 	mkdir /var/run/php && \
 	chmod u+x -R /etc/s6-overlay/scripts && \

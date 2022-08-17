@@ -5,6 +5,5 @@
       "script" : "#!\/bin\/sh\n\n# Build Image\ndocker build -t aliasproject\/php:8.0-cli php\/8.0\/cli\n\n# Tag Image\ndocker tag aliasproject\/php:8.0-cli ghcr.io\/aliasproject\/php:8.0-cli\n\n# Build multiple architectures and push\ndocker buildx build --platform linux\/arm64\/v8,linux\/amd64 --push -t ghcr.io\/aliasproject\/php:8.0-cli php\/8.0\/cli"
     }
   },
-  "identifier" : "B1FC7BF0-3D9A-4427-BA95-B2EC884F1166",
   "openLogOnRun" : "start"
 }
