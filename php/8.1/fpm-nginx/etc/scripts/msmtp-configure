@@ -1,7 +1,7 @@
 #!/usr/bin/with-contenv ash
 
 # Configure PHP to use MSMTP
-sed -i -r 's|;sendmail_path =*|sendmail_path = "/usr/bin/msmtp -t"|g' /etc/php8/php.ini
+sed -i -r 's|;sendmail_path =*|sendmail_path = "/usr/bin/msmtp -t"|g' /etc/php81/php.ini
 
 # Configure MSMTP
 sed -i -r "s/^host .*$/host ${MSMTP_RELAY_SERVER_HOST:-"mailhog"}/g" /etc/msmtprc
