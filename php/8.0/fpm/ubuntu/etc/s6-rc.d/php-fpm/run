@@ -1,0 +1,5 @@
+#!/command/with-contenv sh
+
+# Start PHP-FPM
+/usr/sbin/php-fpm8.0 --nodaemonize
+
