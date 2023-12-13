@@ -1,0 +1,5 @@
+#!/command/with-contenv ash
+
+# Start PHP-FPM
+/usr/sbin/php-fpm82 --nodaemonize
+
