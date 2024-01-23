@@ -5,6 +5,7 @@ LABEL maintainer="Michael Aguiar <mike@aliasproject.com>"
 # Copy php.ini and Install Extensions
 RUN cp $PHP_INI_DIR/php.ini-production $PHP_INI_DIR/php.ini && install-php-extensions \
     pdo_mysql \
+    mysqli \
     gd \
     zip \
     xml \
