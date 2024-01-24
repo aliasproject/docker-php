@@ -1,0 +1,9 @@
+{
+  "actions" : {
+    "build" : {
+      "enabled" : true,
+      "script" : "#!\/bin\/sh\n\ndocker buildx build --platform linux\/arm64\/v8,linux\/amd64 --push \\\n-t ghcr.io\/aliasproject\/php:8.3-frankenphp-wordpress \\\n-t us-docker.pkg.dev\/alias-project-corp\/gcr.io\/php:8.3-frankenphp-wordpress \\\n-t us-docker.pkg.dev\/alias-clients\/gcr.io\/php:8.3-frankenphp-wordpress \\\n-t gcr.io\/alias-cloud\/php:8.3-frankenphp-wordpress \\\n-t us-docker.pkg.dev\/tmg-ventures\/gcr.io\/php:8.3-frankenphp-wordpress \\\n-t us-docker.pkg.dev\/enhanced-care\/gcr.io\/php:8.3-frankenphp-wordpress \\\n-t us-docker.pkg.dev\/guardian-dental\/gcr.io\/php:8.3-frankenphp-wordpress \\\n-t us-docker.pkg.dev\/element-energy\/gcr.io\/php:8.3-frankenphp-wordpress \\\n-t us-docker.pkg.dev\/recruit-sheets\/gcr.io\/php:8.3-frankenphp-wordpress \\\nphp\/8.3\/frankenphp\/wordpress"
+    }
+  },
+  "openLogOnRun" : "start"
+}
