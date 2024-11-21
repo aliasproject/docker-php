@@ -37,7 +37,7 @@ COPY etc/nginx/server-opts.d /etc/nginx/server-opts.d
 COPY etc/msmtprc /etc/msmtprc
 
 # Configure PHP
-COPY etc/php/php-fpm.d/z-fpm-with-overrides.conf /etc/php81/php-fpm.d/z-fpm-with-overrides.conf
+COPY etc/php/php-fpm.d/z-fpm-with-overrides.conf /etc/php83/php-fpm.d/z-fpm-with-overrides.conf
 
 # Run S6
 ENTRYPOINT ["/init"]

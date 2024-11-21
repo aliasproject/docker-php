@@ -1,4 +1,4 @@
-FROM dunglas/frankenphp:1.1.1-php8.2-alpine
+FROM dunglas/frankenphp:1.2.5-php8.2.22-alpine
 
 LABEL maintainer="Michael Aguiar <mike@aliasproject.com>"
 
