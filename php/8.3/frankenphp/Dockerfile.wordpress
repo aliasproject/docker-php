@@ -9,7 +9,7 @@ ENV MSMTP_RELAY_SERVER_HOST= \
     MSMTP_RELAY_SERVER_PASSWORD= \
     MSMTP_RELAY_SERVER_FROM=
 
-COPY /etc/msmtprc /etc/msmtprc
+COPY etc/msmtprc /etc/msmtprc
 COPY docker-configure /usr/local/bin/docker-configure
 
 # Copy php.ini and Install Extensions

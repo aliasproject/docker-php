@@ -1,0 +1,39 @@
+// Static tasks configuration.
+[
+  {
+    "label": "Build 8.2-frankenphp-wordpress",
+    "command": "docker buildx build --platform linux/arm64/v8,linux/amd64 --push -t ghcr.io/aliasproject/php:8.2-frankenphp-wordpress -t us-docker.pkg.dev/alias-project-corp/gcr.io/php:8.2-frankenphp-wordpress -t us-docker.pkg.dev/alias-clients/gcr.io/php:8.2-frankenphp-wordpress -t gcr.io/alias-cloud/php:8.2-frankenphp-wordpress -t gcr.io/alias-alios/php:8.2-frankenphp-wordpress -t us-docker.pkg.dev/tmg-ventures/gcr.io/php:8.2-frankenphp-wordpress -t us-docker.pkg.dev/enhanced-care/gcr.io/php:8.2-frankenphp-wordpress -t us-docker.pkg.dev/guardian-dental/gcr.io/php:8.2-frankenphp-wordpress -t us-docker.pkg.dev/recruit-sheets/gcr.io/php:8.2-frankenphp-wordpress -t us-docker.pkg.dev/the-know-women/gcr.io/php:8.2-frankenphp-wordpress -f php/8.2/frankenphp/Dockerfile.wordpress php/8.2/frankenphp",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "never",
+    "shell": "system"
+  },
+  {
+    "label": "Build 8.3-frankenphp",
+    "command": "docker buildx build --platform linux/arm64/v8,linux/amd64 --push -t ghcr.io/aliasproject/php:8.3-frankenphp -t us-docker.pkg.dev/alias-project-corp/gcr.io/php:8.3-frankenphp -t us-docker.pkg.dev/alias-clients/gcr.io/php:8.3-frankenphp -t gcr.io/alias-cloud/php:8.3-frankenphp -t gcr.io/alias-alios/php:8.3-frankenphp -t us-docker.pkg.dev/tmg-ventures/gcr.io/php:8.3-frankenphp -t us-docker.pkg.dev/enhanced-care/gcr.io/php:8.3-frankenphp -t us-docker.pkg.dev/guardian-dental/gcr.io/php:8.3-frankenphp -t us-docker.pkg.dev/recruit-sheets/gcr.io/php:8.3-frankenphp -t us-docker.pkg.dev/the-know-women/gcr.io/php:8.3-frankenphp php/8.3/frankenphp",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "never",
+    "shell": "system"
+  },
+  {
+    "label": "Build 8.3-frankenphp-wordpress",
+    "command": "docker buildx build --platform linux/arm64/v8,linux/amd64 --push -t ghcr.io/aliasproject/php:8.3-frankenphp-wordpress -t us-docker.pkg.dev/alias-project-corp/gcr.io/php:8.3-frankenphp-wordpress -t us-docker.pkg.dev/alias-clients/gcr.io/php:8.3-frankenphp-wordpress -t gcr.io/alias-cloud/php:8.3-frankenphp-wordpress -t gcr.io/alias-alios/php:8.3-frankenphp-wordpress -t us-docker.pkg.dev/tmg-ventures/gcr.io/php:8.3-frankenphp-wordpress -t us-docker.pkg.dev/enhanced-care/gcr.io/php:8.3-frankenphp-wordpress -t us-docker.pkg.dev/guardian-dental/gcr.io/php:8.3-frankenphp-wordpress -t us-docker.pkg.dev/recruit-sheets/gcr.io/php:8.3-frankenphp-wordpress -t us-docker.pkg.dev/the-know-women/gcr.io/php:8.3-frankenphp-wordpress -f php/8.3/frankenphp/Dockerfile.wordpress php/8.3/frankenphp",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "never",
+    "shell": "system"
+  },
+  {
+    "label": "Build 8.4-frankenphp",
+    "command": "docker buildx build --platform linux/arm64/v8,linux/amd64 --push -t ghcr.io/aliasproject/php:8.4-frankenphp -t us-docker.pkg.dev/alias-project-corp/gcr.io/php:8.4-frankenphp -t us-docker.pkg.dev/alias-clients/gcr.io/php:8.4-frankenphp -t gcr.io/alias-cloud/php:8.4-frankenphp -t gcr.io/alias-alios/php:8.4-frankenphp -t us-docker.pkg.dev/tmg-ventures/gcr.io/php:8.4-frankenphp -t us-docker.pkg.dev/enhanced-care/gcr.io/php:8.4-frankenphp -t us-docker.pkg.dev/guardian-dental/gcr.io/php:8.4-frankenphp -t us-docker.pkg.dev/recruit-sheets/gcr.io/php:8.4-frankenphp -t us-docker.pkg.dev/the-know-women/gcr.io/php:8.4-frankenphp php/8.4/frankenphp",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "never",
+    "shell": "system"
+  }
+]
