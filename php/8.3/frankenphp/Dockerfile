@@ -21,6 +21,7 @@ RUN chmod +x /usr/local/bin/docker-configure && \
     gd \
     zip \
     xml \
+    intl \
     bcmath \
     opcache
 

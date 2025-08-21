@@ -1,9 +1,0 @@
-{
-  "actions" : {
-    "build" : {
-      "enabled" : true,
-      "script" : "#!\/bin\/sh\n\n# Build Image\ndocker build -t aliasproject\/php:8.2-fpm php\/8.2\/fpm\n\n# Tag Image\ndocker tag aliasproject\/php:8.2-fpm ghcr.io\/aliasproject\/php:8.2-fpm\n\n# Build multiple architectures and push\ndocker buildx build --platform linux\/arm64\/v8,linux\/amd64 --push -t ghcr.io\/aliasproject\/php:8.2-fpm php\/8.2\/fpm"
-    }
-  },
-  "openLogOnRun" : "start"
-}
