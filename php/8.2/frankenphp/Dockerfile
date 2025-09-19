@@ -18,9 +18,15 @@ RUN chmod +x /usr/local/bin/docker-configure && \
     cp $PHP_INI_DIR/php.ini-production $PHP_INI_DIR/php.ini && \
     install-php-extensions \
     pdo_mysql \
+    pdo \
+    fileinfo \
+    tokenizer \
+    dom \
+    session \
     gd \
     zip \
     xml \
+    simplexml \
     intl \
     bcmath \
     opcache
