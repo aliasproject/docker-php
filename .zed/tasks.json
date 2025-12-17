@@ -7,7 +7,7 @@
     "allow_concurrent_runs": false,
     "reveal": "always",
     "hide": "never",
-    "shell": "system"
+    "shell": "system",
   },
   {
     "label": "Build 8.2-frankenphp-dev",
@@ -16,7 +16,7 @@
     "allow_concurrent_runs": false,
     "reveal": "always",
     "hide": "never",
-    "shell": "system"
+    "shell": "system",
   },
   {
     "label": "Build 8.2-frankenphp-wordpress",
@@ -25,34 +25,7 @@
     "allow_concurrent_runs": false,
     "reveal": "always",
     "hide": "never",
-    "shell": "system"
-  },
-  {
-    "label": "Build 8.3-frankenphp",
-    "command": "docker buildx build --platform linux/arm64/v8,linux/amd64 --push -t ghcr.io/aliasproject/php:8.3-frankenphp php/8.3/frankenphp",
-    "use_new_terminal": true,
-    "allow_concurrent_runs": false,
-    "reveal": "always",
-    "hide": "never",
-    "shell": "system"
-  },
-  {
-    "label": "Build 8.3-frankenphp-dev",
-    "command": "docker buildx build --platform linux/arm64/v8,linux/amd64 --push -t ghcr.io/aliasproject/php:8.3-frankenphp-dev -f php/8.3/frankenphp/Dockerfile.dev php/8.3/frankenphp",
-    "use_new_terminal": true,
-    "allow_concurrent_runs": false,
-    "reveal": "always",
-    "hide": "never",
-    "shell": "system"
-  },
-  {
-    "label": "Build 8.3-frankenphp-wordpress",
-    "command": "docker buildx build --platform linux/arm64/v8,linux/amd64 --push -t ghcr.io/aliasproject/php:8.3-frankenphp-wordpress -f php/8.3/frankenphp/Dockerfile.wordpress php/8.3/frankenphp",
-    "use_new_terminal": true,
-    "allow_concurrent_runs": false,
-    "reveal": "always",
-    "hide": "never",
-    "shell": "system"
+    "shell": "system",
   },
   {
     "label": "Build 8.3-cli",
@@ -61,7 +34,43 @@
     "allow_concurrent_runs": false,
     "reveal": "always",
     "hide": "never",
-    "shell": "system"
+    "shell": "system",
+  },
+  {
+    "label": "Build 8.3-frankenphp",
+    "command": "docker buildx build --platform linux/arm64/v8,linux/amd64 --push -t ghcr.io/aliasproject/php:8.3-frankenphp php/8.3/frankenphp",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "never",
+    "shell": "system",
+  },
+  {
+    "label": "Build 8.3-frankenphp-dev",
+    "command": "docker buildx build --platform linux/arm64/v8,linux/amd64 --push -t ghcr.io/aliasproject/php:8.3-frankenphp-dev -f php/8.3/frankenphp/Dockerfile.dev php/8.3/frankenphp",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "never",
+    "shell": "system",
+  },
+  {
+    "label": "Build 8.3-frankenphp-wordpress",
+    "command": "docker buildx build --platform linux/arm64/v8,linux/amd64 --push -t ghcr.io/aliasproject/php:8.3-frankenphp-wordpress -f php/8.3/frankenphp/Dockerfile.wordpress php/8.3/frankenphp",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "never",
+    "shell": "system",
+  },
+  {
+    "label": "Build 8.3-cli",
+    "command": "docker buildx build --platform linux/arm64/v8,linux/amd64 --push -t ghcr.io/aliasproject/php:8.3-cli -f php/8.3/cli/Dockerfile php/8.3/cli",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "never",
+    "shell": "system",
   },
   {
     "label": "Build 8.4-frankenphp",
@@ -70,7 +79,7 @@
     "allow_concurrent_runs": false,
     "reveal": "always",
     "hide": "never",
-    "shell": "system"
+    "shell": "system",
   },
   {
     "label": "Build 8.4-frankenphp-dev",
@@ -79,7 +88,7 @@
     "allow_concurrent_runs": false,
     "reveal": "always",
     "hide": "never",
-    "shell": "system"
+    "shell": "system",
   },
   {
     "label": "Build 8.4-frankenphp-wordpress",
@@ -88,7 +97,7 @@
     "allow_concurrent_runs": false,
     "reveal": "always",
     "hide": "never",
-    "shell": "system"
+    "shell": "system",
   },
   {
     "label": "Build 8.4-cli",
@@ -97,6 +106,6 @@
     "allow_concurrent_runs": false,
     "reveal": "always",
     "hide": "never",
-    "shell": "system"
-  }
+    "shell": "system",
+  },
 ]

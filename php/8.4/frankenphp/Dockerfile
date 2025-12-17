@@ -1,4 +1,4 @@
-FROM dunglas/frankenphp:1.7-php8.4-alpine
+FROM dunglas/frankenphp:1.9-php8.4-alpine
 
 LABEL maintainer="Michael Aguiar <mike@aliasproject.com>"
 
@@ -18,12 +18,13 @@ RUN chmod +x /usr/local/bin/docker-configure && \
     cp $PHP_INI_DIR/php.ini-production $PHP_INI_DIR/php.ini && \
     install-php-extensions \
     pdo_mysql \
+    mysqli \
     gd \
     zip \
-    xml \
     intl \
     bcmath \
-    opcache
+    pcntl \
+    posix
 
 ENTRYPOINT ["docker-configure"]
 CMD [ "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
