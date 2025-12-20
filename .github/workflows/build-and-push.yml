@@ -4,6 +4,42 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      force_build_all:
+        description: "Force build all images (ignore changed files)"
+        required: false
+        default: false
+        type: boolean
+      build_php_74:
+        description: "Force build PHP 7.4 images"
+        required: false
+        default: false
+        type: boolean
+      build_php_80:
+        description: "Force build PHP 8.0 images"
+        required: false
+        default: false
+        type: boolean
+      build_php_81:
+        description: "Force build PHP 8.1 images"
+        required: false
+        default: false
+        type: boolean
+      build_php_82:
+        description: "Force build PHP 8.2 images"
+        required: false
+        default: false
+        type: boolean
+      build_php_83:
+        description: "Force build PHP 8.3 images"
+        required: false
+        default: false
+        type: boolean
+      build_php_84:
+        description: "Force build PHP 8.4 images"
+        required: false
+        default: false
+        type: boolean
 
 env:
   REGISTRY: ghcr.io
@@ -67,7 +103,7 @@ jobs:
 
       # PHP 7.4
       - name: Build and push PHP 7.4 CLI
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/7.4/cli/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_74 || contains(steps.changed-files.outputs.all_changed_files, 'php/7.4/cli/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/7.4/cli
@@ -79,7 +115,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-cli-${{ github.sha }}
 
       - name: Build and push PHP 7.4 FPM
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/7.4/fpm/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_74 || contains(steps.changed-files.outputs.all_changed_files, 'php/7.4/fpm/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/7.4/fpm
@@ -91,11 +127,11 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-${{ github.sha }}
 
       - name: Wait for 7.4-fpm to propagate
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/7.4/fpm/Dockerfile') && contains(steps.changed-files.outputs.all_changed_files, 'php/7.4/fpm-nginx/Dockerfile')
+        if: (inputs.force_build_all || inputs.build_php_74 || contains(steps.changed-files.outputs.all_changed_files, 'php/7.4/fpm/Dockerfile')) && (inputs.force_build_all || inputs.build_php_74 || contains(steps.changed-files.outputs.all_changed_files, 'php/7.4/fpm-nginx/Dockerfile'))
         run: sleep 10
 
       - name: Build and push PHP 7.4 FPM-Nginx
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/7.4/fpm-nginx/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_74 || contains(steps.changed-files.outputs.all_changed_files, 'php/7.4/fpm-nginx/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/7.4/fpm-nginx
@@ -108,7 +144,7 @@ jobs:
 
       # PHP 8.0
       - name: Build and push PHP 8.0 CLI
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.0/cli/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_80 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.0/cli/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/8.0/cli
@@ -120,7 +156,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.0-cli-${{ github.sha }}
 
       - name: Build and push PHP 8.0 FPM Alpine
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.0/fpm/alpine/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_80 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.0/fpm/alpine/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/8.0/fpm/alpine
@@ -132,7 +168,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.0-fpm-alpine-${{ github.sha }}
 
       - name: Build and push PHP 8.0 FPM Ubuntu
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.0/fpm/ubuntu/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_80 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.0/fpm/ubuntu/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/8.0/fpm/ubuntu
@@ -144,7 +180,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.0-fpm-ubuntu-${{ github.sha }}
 
       - name: Build and push PHP 8.0 FPM-Nginx
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.0/fpm-nginx/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_80 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.0/fpm-nginx/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/8.0/fpm-nginx
@@ -157,7 +193,7 @@ jobs:
 
       # PHP 8.1
       - name: Build and push PHP 8.1 CLI
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.1/cli/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_81 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.1/cli/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/8.1/cli
@@ -169,7 +205,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.1-cli-${{ github.sha }}
 
       - name: Build and push PHP 8.1 FPM
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.1/fpm/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_81 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.1/fpm/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/8.1/fpm
@@ -181,11 +217,11 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.1-fpm-${{ github.sha }}
 
       - name: Wait for 8.1-fpm to propagate
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.1/fpm/Dockerfile') && contains(steps.changed-files.outputs.all_changed_files, 'php/8.1/fpm-nginx/Dockerfile')
+        if: (inputs.force_build_all || inputs.build_php_81 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.1/fpm/Dockerfile')) && (inputs.force_build_all || inputs.build_php_81 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.1/fpm-nginx/Dockerfile'))
         run: sleep 10
 
       - name: Build and push PHP 8.1 FPM-Nginx
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.1/fpm-nginx/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_81 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.1/fpm-nginx/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/8.1/fpm-nginx
@@ -198,7 +234,7 @@ jobs:
 
       # PHP 8.2
       - name: Build and push PHP 8.2 FPM
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.2/fpm/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_82 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.2/fpm/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/8.2/fpm
@@ -210,11 +246,11 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-fpm-${{ github.sha }}
 
       - name: Wait for 8.2-fpm to propagate
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.2/fpm/Dockerfile') && contains(steps.changed-files.outputs.all_changed_files, 'php/8.2/fpm-nginx/Dockerfile')
+        if: (inputs.force_build_all || inputs.build_php_82 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.2/fpm/Dockerfile')) && (inputs.force_build_all || inputs.build_php_82 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.2/fpm-nginx/Dockerfile'))
         run: sleep 10
 
       - name: Build and push PHP 8.2 FPM-Nginx
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.2/fpm-nginx/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_82 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.2/fpm-nginx/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/8.2/fpm-nginx
@@ -226,7 +262,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-fpm-nginx-${{ github.sha }}
 
       - name: Build and push PHP 8.2 FrankenPHP
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.2/frankenphp/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_82 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.2/frankenphp/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/8.2/frankenphp
@@ -238,7 +274,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-frankenphp-${{ github.sha }}
 
       - name: Build and push PHP 8.2 FrankenPHP Dev
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.2/frankenphp/Dockerfile.dev')
+        if: inputs.force_build_all || inputs.build_php_82 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.2/frankenphp/Dockerfile.dev')
         uses: docker/build-push-action@v5
         with:
           context: php/8.2/frankenphp
@@ -250,7 +286,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-frankenphp-dev-${{ github.sha }}
 
       - name: Build and push PHP 8.2 FrankenPHP WordPress
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.2/frankenphp/Dockerfile.wordpress')
+        if: inputs.force_build_all || inputs.build_php_82 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.2/frankenphp/Dockerfile.wordpress')
         uses: docker/build-push-action@v5
         with:
           context: php/8.2/frankenphp
@@ -263,7 +299,7 @@ jobs:
 
       # PHP 8.3
       - name: Build and push PHP 8.3 CLI
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.3/cli/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_83 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.3/cli/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/8.3/cli
@@ -275,7 +311,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.3-cli-${{ github.sha }}
 
       - name: Build and push PHP 8.3 FPM
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.3/fpm/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_83 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.3/fpm/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/8.3/fpm
@@ -287,11 +323,11 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.3-fpm-${{ github.sha }}
 
       - name: Wait for 8.3-fpm to propagate
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.3/fpm/Dockerfile') && contains(steps.changed-files.outputs.all_changed_files, 'php/8.3/fpm-nginx/Dockerfile')
+        if: (inputs.force_build_all || inputs.build_php_83 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.3/fpm/Dockerfile')) && (inputs.force_build_all || inputs.build_php_83 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.3/fpm-nginx/Dockerfile'))
         run: sleep 10
 
       - name: Build and push PHP 8.3 FPM-Nginx
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.3/fpm-nginx/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_83 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.3/fpm-nginx/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/8.3/fpm-nginx
@@ -303,7 +339,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.3-fpm-nginx-${{ github.sha }}
 
       - name: Build and push PHP 8.3 FrankenPHP
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.3/frankenphp/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_83 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.3/frankenphp/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/8.3/frankenphp
@@ -315,7 +351,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.3-frankenphp-${{ github.sha }}
 
       - name: Build and push PHP 8.3 FrankenPHP Dev
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.3/frankenphp/Dockerfile.dev')
+        if: inputs.force_build_all || inputs.build_php_83 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.3/frankenphp/Dockerfile.dev')
         uses: docker/build-push-action@v5
         with:
           context: php/8.3/frankenphp
@@ -327,7 +363,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.3-frankenphp-dev-${{ github.sha }}
 
       - name: Build and push PHP 8.3 FrankenPHP WordPress
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.3/frankenphp/Dockerfile.wordpress')
+        if: inputs.force_build_all || inputs.build_php_83 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.3/frankenphp/Dockerfile.wordpress')
         uses: docker/build-push-action@v5
         with:
           context: php/8.3/frankenphp
@@ -340,7 +376,7 @@ jobs:
 
       # PHP 8.4
       - name: Build and push PHP 8.4 CLI
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.4/cli/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_84 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.4/cli/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/8.4/cli
@@ -352,7 +388,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.4-cli-${{ github.sha }}
 
       - name: Build and push PHP 8.4 FPM
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.4/fpm/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_84 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.4/fpm/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/8.4/fpm
@@ -364,11 +400,11 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.4-fpm-${{ github.sha }}
 
       - name: Wait for 8.4-fpm to propagate
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.4/fpm/Dockerfile') && contains(steps.changed-files.outputs.all_changed_files, 'php/8.4/fpm-nginx/Dockerfile')
+        if: (inputs.force_build_all || inputs.build_php_84 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.4/fpm/Dockerfile')) && (inputs.force_build_all || inputs.build_php_84 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.4/fpm-nginx/Dockerfile'))
         run: sleep 10
 
       - name: Build and push PHP 8.4 FPM-Nginx
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.4/fpm-nginx/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_84 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.4/fpm-nginx/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/8.4/fpm-nginx
@@ -380,7 +416,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.4-fpm-nginx-${{ github.sha }}
 
       - name: Build and push PHP 8.4 FrankenPHP
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.4/frankenphp/Dockerfile')
+        if: inputs.force_build_all || inputs.build_php_84 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.4/frankenphp/Dockerfile')
         uses: docker/build-push-action@v5
         with:
           context: php/8.4/frankenphp
@@ -392,7 +428,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.4-frankenphp-${{ github.sha }}
 
       - name: Build and push PHP 8.4 FrankenPHP Dev
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.4/frankenphp/Dockerfile.dev')
+        if: inputs.force_build_all || inputs.build_php_84 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.4/frankenphp/Dockerfile.dev')
         uses: docker/build-push-action@v5
         with:
           context: php/8.4/frankenphp
@@ -404,7 +440,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.4-frankenphp-dev-${{ github.sha }}
 
       - name: Build and push PHP 8.4 FrankenPHP WordPress
-        if: contains(steps.changed-files.outputs.all_changed_files, 'php/8.4/frankenphp/Dockerfile.wordpress')
+        if: inputs.force_build_all || inputs.build_php_84 || contains(steps.changed-files.outputs.all_changed_files, 'php/8.4/frankenphp/Dockerfile.wordpress')
         uses: docker/build-push-action@v5
         with:
           context: php/8.4/frankenphp
