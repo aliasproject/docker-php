@@ -30,39 +30,39 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # PHP 7.4
-      - name: Build and push PHP 7.4 CLI
-        uses: docker/build-push-action@v5
-        with:
-          context: php/7.4/cli
-          file: php/7.4/cli/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-cli-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-cli-${{ github.sha }}
+      # # PHP 7.4
+      # - name: Build and push PHP 7.4 CLI
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: php/7.4/cli
+      #     file: php/7.4/cli/Dockerfile
+      #     push: true
+      #     platforms: linux/amd64,linux/arm64
+      #     tags: |
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-cli-latest
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-cli-${{ github.sha }}
 
-      - name: Build and push PHP 7.4 FPM
-        uses: docker/build-push-action@v5
-        with:
-          context: php/7.4/fpm
-          file: php/7.4/fpm/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-${{ github.sha }}
+      # - name: Build and push PHP 7.4 FPM
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: php/7.4/fpm
+      #     file: php/7.4/fpm/Dockerfile
+      #     push: true
+      #     platforms: linux/amd64,linux/arm64
+      #     tags: |
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-latest
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-${{ github.sha }}
 
-      - name: Build and push PHP 7.4 FPM-Nginx
-        uses: docker/build-push-action@v5
-        with:
-          context: php/7.4/fpm-nginx
-          file: php/7.4/fpm-nginx/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-nginx-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-nginx-${{ github.sha }}
+      # - name: Build and push PHP 7.4 FPM-Nginx
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: php/7.4/fpm-nginx
+      #     file: php/7.4/fpm-nginx/Dockerfile
+      #     push: true
+      #     platforms: linux/amd64,linux/arm64
+      #     tags: |
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-nginx-latest
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-nginx-${{ github.sha }}
 
       # PHP 8.0
       - name: Build and push PHP 8.0 CLI
