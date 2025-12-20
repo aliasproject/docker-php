@@ -30,39 +30,39 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # # PHP 7.4
-      # - name: Build and push PHP 7.4 CLI
-      #   uses: docker/build-push-action@v5
-      #   with:
-      #     context: php/7.4/cli
-      #     file: php/7.4/cli/Dockerfile
-      #     push: true
-      #     platforms: linux/amd64,linux/arm64
-      #     tags: |
-      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-cli-latest
-      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-cli-${{ github.sha }}
+      # PHP 7.4
+      - name: Build and push PHP 7.4 CLI
+        uses: docker/build-push-action@v5
+        with:
+          context: php/7.4/cli
+          file: php/7.4/cli/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-cli-latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-cli-${{ github.sha }}
 
-      # - name: Build and push PHP 7.4 FPM
-      #   uses: docker/build-push-action@v5
-      #   with:
-      #     context: php/7.4/fpm
-      #     file: php/7.4/fpm/Dockerfile
-      #     push: true
-      #     platforms: linux/amd64,linux/arm64
-      #     tags: |
-      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-latest
-      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-${{ github.sha }}
+      - name: Build and push PHP 7.4 FPM
+        uses: docker/build-push-action@v5
+        with:
+          context: php/7.4/fpm
+          file: php/7.4/fpm/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-${{ github.sha }}
 
-      # - name: Build and push PHP 7.4 FPM-Nginx
-      #   uses: docker/build-push-action@v5
-      #   with:
-      #     context: php/7.4/fpm-nginx
-      #     file: php/7.4/fpm-nginx/Dockerfile
-      #     push: true
-      #     platforms: linux/amd64,linux/arm64
-      #     tags: |
-      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-nginx-latest
-      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-nginx-${{ github.sha }}
+      - name: Build and push PHP 7.4 FPM-Nginx
+        uses: docker/build-push-action@v5
+        with:
+          context: php/7.4/fpm-nginx
+          file: php/7.4/fpm-nginx/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-nginx-latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-nginx-${{ github.sha }}
 
       # PHP 8.0
       - name: Build and push PHP 8.0 CLI
@@ -143,7 +143,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.1-fpm-nginx-latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.1-fpm-nginx-${{ github.sha }}
 
-      # PHP 8.2
+      # PHP 8.2 (no CLI)
       - name: Build and push PHP 8.2 FPM
         uses: docker/build-push-action@v5
         with:
@@ -351,5 +351,7 @@ jobs:
           echo "- **PHP 8.2:** \`8.2-fpm-latest\`, \`8.2-fpm-nginx-latest\`, \`8.2-frankenphp-latest\`, \`8.2-frankenphp-dev-latest\`, \`8.2-frankenphp-wordpress-latest\`" >> $GITHUB_STEP_SUMMARY
           echo "- **PHP 8.3:** \`8.3-cli-latest\`, \`8.3-fpm-latest\`, \`8.3-fpm-nginx-latest\`, \`8.3-frankenphp-latest\`, \`8.3-frankenphp-dev-latest\`, \`8.3-frankenphp-wordpress-latest\`" >> $GITHUB_STEP_SUMMARY
           echo "- **PHP 8.4:** \`8.4-cli-latest\`, \`8.4-fpm-latest\`, \`8.4-fpm-nginx-latest\`, \`8.4-frankenphp-latest\`, \`8.4-frankenphp-dev-latest\`, \`8.4-frankenphp-wordpress-latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note:** Each image also has a SHA-tagged version (e.g., \`8.3-frankenphp-abc1234\`) for rollbacks." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Status:** ${{ needs.build-and-push.result == 'success' && '✅ All builds successful!' || '❌ Some builds failed' }}" >> $GITHUB_STEP_SUMMARY
