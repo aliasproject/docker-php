@@ -31,173 +31,173 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # PHP 7.4
-      - name: Build and push PHP 7.4 CLI
-        uses: docker/build-push-action@v5
-        with:
-          context: php/7.4/cli
-          file: php/7.4/cli/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-cli-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-cli-${{ github.sha }}
+      # - name: Build and push PHP 7.4 CLI
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: php/7.4/cli
+      #     file: php/7.4/cli/Dockerfile
+      #     push: true
+      #     platforms: linux/amd64,linux/arm64
+      #     tags: |
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-cli-latest
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-cli-${{ github.sha }}
 
-      - name: Build and push PHP 7.4 FPM
-        uses: docker/build-push-action@v5
-        with:
-          context: php/7.4/fpm
-          file: php/7.4/fpm/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-${{ github.sha }}
+      # - name: Build and push PHP 7.4 FPM
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: php/7.4/fpm
+      #     file: php/7.4/fpm/Dockerfile
+      #     push: true
+      #     platforms: linux/amd64,linux/arm64
+      #     tags: |
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-latest
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-${{ github.sha }}
 
-      - name: Build and push PHP 7.4 FPM-Nginx
-        uses: docker/build-push-action@v5
-        with:
-          context: php/7.4/fpm-nginx
-          file: php/7.4/fpm-nginx/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-nginx-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-nginx-${{ github.sha }}
+      # - name: Build and push PHP 7.4 FPM-Nginx
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: php/7.4/fpm-nginx
+      #     file: php/7.4/fpm-nginx/Dockerfile
+      #     push: true
+      #     platforms: linux/amd64,linux/arm64
+      #     tags: |
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-nginx-latest
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:7.4-fpm-nginx-${{ github.sha }}
 
-      # PHP 8.0
-      - name: Build and push PHP 8.0 CLI
-        uses: docker/build-push-action@v5
-        with:
-          context: php/8.0/cli
-          file: php/8.0/cli/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.0-cli-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.0-cli-${{ github.sha }}
+      # # PHP 8.0
+      # - name: Build and push PHP 8.0 CLI
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: php/8.0/cli
+      #     file: php/8.0/cli/Dockerfile
+      #     push: true
+      #     platforms: linux/amd64,linux/arm64
+      #     tags: |
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.0-cli-latest
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.0-cli-${{ github.sha }}
 
-      - name: Build and push PHP 8.0 FPM Alpine
-        uses: docker/build-push-action@v5
-        with:
-          context: php/8.0/fpm/alpine
-          file: php/8.0/fpm/alpine/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.0-fpm-alpine-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.0-fpm-alpine-${{ github.sha }}
+      # - name: Build and push PHP 8.0 FPM Alpine
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: php/8.0/fpm/alpine
+      #     file: php/8.0/fpm/alpine/Dockerfile
+      #     push: true
+      #     platforms: linux/amd64,linux/arm64
+      #     tags: |
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.0-fpm-alpine-latest
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.0-fpm-alpine-${{ github.sha }}
 
-      - name: Build and push PHP 8.0 FPM Ubuntu
-        uses: docker/build-push-action@v5
-        with:
-          context: php/8.0/fpm/ubuntu
-          file: php/8.0/fpm/ubuntu/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.0-fpm-ubuntu-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.0-fpm-ubuntu-${{ github.sha }}
+      # - name: Build and push PHP 8.0 FPM Ubuntu
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: php/8.0/fpm/ubuntu
+      #     file: php/8.0/fpm/ubuntu/Dockerfile
+      #     push: true
+      #     platforms: linux/amd64,linux/arm64
+      #     tags: |
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.0-fpm-ubuntu-latest
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.0-fpm-ubuntu-${{ github.sha }}
 
-      - name: Build and push PHP 8.0 FPM-Nginx
-        uses: docker/build-push-action@v5
-        with:
-          context: php/8.0/fpm-nginx
-          file: php/8.0/fpm-nginx/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.0-fpm-nginx-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.0-fpm-nginx-${{ github.sha }}
+      # - name: Build and push PHP 8.0 FPM-Nginx
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: php/8.0/fpm-nginx
+      #     file: php/8.0/fpm-nginx/Dockerfile
+      #     push: true
+      #     platforms: linux/amd64,linux/arm64
+      #     tags: |
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.0-fpm-nginx-latest
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.0-fpm-nginx-${{ github.sha }}
 
-      # PHP 8.1
-      - name: Build and push PHP 8.1 CLI
-        uses: docker/build-push-action@v5
-        with:
-          context: php/8.1/cli
-          file: php/8.1/cli/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.1-cli-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.1-cli-${{ github.sha }}
+      # # PHP 8.1
+      # - name: Build and push PHP 8.1 CLI
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: php/8.1/cli
+      #     file: php/8.1/cli/Dockerfile
+      #     push: true
+      #     platforms: linux/amd64,linux/arm64
+      #     tags: |
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.1-cli-latest
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.1-cli-${{ github.sha }}
 
-      - name: Build and push PHP 8.1 FPM
-        uses: docker/build-push-action@v5
-        with:
-          context: php/8.1/fpm
-          file: php/8.1/fpm/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.1-fpm-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.1-fpm-${{ github.sha }}
+      # - name: Build and push PHP 8.1 FPM
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: php/8.1/fpm
+      #     file: php/8.1/fpm/Dockerfile
+      #     push: true
+      #     platforms: linux/amd64,linux/arm64
+      #     tags: |
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.1-fpm-latest
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.1-fpm-${{ github.sha }}
 
-      - name: Build and push PHP 8.1 FPM-Nginx
-        uses: docker/build-push-action@v5
-        with:
-          context: php/8.1/fpm-nginx
-          file: php/8.1/fpm-nginx/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.1-fpm-nginx-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.1-fpm-nginx-${{ github.sha }}
+      # - name: Build and push PHP 8.1 FPM-Nginx
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: php/8.1/fpm-nginx
+      #     file: php/8.1/fpm-nginx/Dockerfile
+      #     push: true
+      #     platforms: linux/amd64,linux/arm64
+      #     tags: |
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.1-fpm-nginx-latest
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.1-fpm-nginx-${{ github.sha }}
 
-      # PHP 8.2 (no CLI)
-      - name: Build and push PHP 8.2 FPM
-        uses: docker/build-push-action@v5
-        with:
-          context: php/8.2/fpm
-          file: php/8.2/fpm/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-fpm-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-fpm-${{ github.sha }}
+      # # PHP 8.2 (no CLI)
+      # - name: Build and push PHP 8.2 FPM
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: php/8.2/fpm
+      #     file: php/8.2/fpm/Dockerfile
+      #     push: true
+      #     platforms: linux/amd64,linux/arm64
+      #     tags: |
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-fpm-latest
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-fpm-${{ github.sha }}
 
-      - name: Build and push PHP 8.2 FPM-Nginx
-        uses: docker/build-push-action@v5
-        with:
-          context: php/8.2/fpm-nginx
-          file: php/8.2/fpm-nginx/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-fpm-nginx-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-fpm-nginx-${{ github.sha }}
+      # - name: Build and push PHP 8.2 FPM-Nginx
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: php/8.2/fpm-nginx
+      #     file: php/8.2/fpm-nginx/Dockerfile
+      #     push: true
+      #     platforms: linux/amd64,linux/arm64
+      #     tags: |
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-fpm-nginx-latest
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-fpm-nginx-${{ github.sha }}
 
-      - name: Build and push PHP 8.2 FrankenPHP
-        uses: docker/build-push-action@v5
-        with:
-          context: php/8.2/frankenphp
-          file: php/8.2/frankenphp/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-frankenphp-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-frankenphp-${{ github.sha }}
+      # - name: Build and push PHP 8.2 FrankenPHP
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: php/8.2/frankenphp
+      #     file: php/8.2/frankenphp/Dockerfile
+      #     push: true
+      #     platforms: linux/amd64,linux/arm64
+      #     tags: |
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-frankenphp-latest
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-frankenphp-${{ github.sha }}
 
-      - name: Build and push PHP 8.2 FrankenPHP Dev
-        uses: docker/build-push-action@v5
-        with:
-          context: php/8.2/frankenphp
-          file: php/8.2/frankenphp/Dockerfile.dev
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-frankenphp-dev-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-frankenphp-dev-${{ github.sha }}
+      # - name: Build and push PHP 8.2 FrankenPHP Dev
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: php/8.2/frankenphp
+      #     file: php/8.2/frankenphp/Dockerfile.dev
+      #     push: true
+      #     platforms: linux/amd64,linux/arm64
+      #     tags: |
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-frankenphp-dev-latest
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-frankenphp-dev-${{ github.sha }}
 
-      - name: Build and push PHP 8.2 FrankenPHP WordPress
-        uses: docker/build-push-action@v5
-        with:
-          context: php/8.2/frankenphp
-          file: php/8.2/frankenphp/Dockerfile.wordpress
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-frankenphp-wordpress-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-frankenphp-wordpress-${{ github.sha }}
+      # - name: Build and push PHP 8.2 FrankenPHP WordPress
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: php/8.2/frankenphp
+      #     file: php/8.2/frankenphp/Dockerfile.wordpress
+      #     push: true
+      #     platforms: linux/amd64,linux/arm64
+      #     tags: |
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-frankenphp-wordpress-latest
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:8.2-frankenphp-wordpress-${{ github.sha }}
 
       # PHP 8.3
       - name: Build and push PHP 8.3 CLI
