@@ -19,6 +19,7 @@ RUN chmod +x /usr/local/bin/docker-configure && \
     install-php-extensions \
     pdo_mysql \
     mysqli \
+    redis \
     gd \
     zip \
     intl \

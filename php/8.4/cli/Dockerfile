@@ -32,7 +32,9 @@ RUN apk add --update --no-cache \
     php84-tokenizer \
     php84-zip \
     php84-pcntl \
-    php84-posix
+    php84-posix \
+    php84-pecl-redis \
+    php84-sodium
 
 # Set default work directory
 WORKDIR /app

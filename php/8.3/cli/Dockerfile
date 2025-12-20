@@ -32,7 +32,9 @@ RUN apk add --update --no-cache \
     php83-tokenizer \
     php83-zip \
     php83-pcntl \
-    php83-posix
+    php83-posix \
+    php83-pecl-redis \
+    php83-sodium
 
 # Create symlink for generic php command
 RUN ln -s /usr/bin/php83 /usr/bin/php
