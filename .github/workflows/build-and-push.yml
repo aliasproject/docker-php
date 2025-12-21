@@ -43,8 +43,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: aliasproject/php
-  #${{ github.repository }}
+  IMAGE_NAME: ${{ github.repository_owner }}/php
 
 jobs:
   build-and-push:
