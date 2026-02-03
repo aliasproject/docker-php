@@ -25,7 +25,8 @@ RUN chmod +x /usr/local/bin/docker-configure && \
     intl \
     bcmath \
     pcntl \
-    posix
+    posix \
+    exif
 
 ENTRYPOINT ["docker-configure"]
 CMD [ "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
