@@ -1,14 +1,35 @@
 #!/bin/ash
+set -e
 
-# Configure PHP
-sed -i -r 's|;sendmail_path =*|sendmail_path = "/usr/bin/msmtp -t"|g' $PHP_INI_DIR/php.ini && \
+# Apply PHP ini tuning from environment
+{
+    echo "memory_limit = ${PHP_MEMORY_LIMIT:-256M}"
+    echo "max_execution_time = ${PHP_MAX_EXECUTION_TIME:-60}"
+    echo "opcache.enable = 1"
+    echo "opcache.memory_consumption = 128"
+    echo "opcache.max_accelerated_files = 10000"
+    echo "opcache.validate_timestamps = 0"
+    echo "opcache.jit = tracing"
+    echo "opcache.jit_buffer_size = 128M"
+} > $PHP_INI_DIR/conf.d/app.ini
 
-# Configure MSMTP
-sed -i -r "s/^host .*$/host ${MSMTP_RELAY_SERVER_HOST:-"mailhog"}/g" /etc/msmtprc
-sed -i -r "s/^port .*$/port ${MSMTP_RELAY_SERVER_PORT:-"1025"}/g" /etc/msmtprc
-sed -i -r "s/^auth .*$/auth ${MSMTP_RELAY_SERVER_AUTH:-"on"}/g" /etc/msmtprc
-sed -i -r "s/^user .*$/user ${MSMTP_RELAY_SERVER_USER}/g" /etc/msmtprc
-sed -i -r "s/^password .*$/password ${MSMTP_RELAY_SERVER_PASSWORD}/g" /etc/msmtprc
-sed -i -r "s/^from .*$/from ${MSMTP_RELAY_SERVER_FROM}/g" /etc/msmtprc
+# Generate msmtp config from environment
+cat > /etc/msmtprc <<EOF
+defaults
+tls ${MSMTP_RELAY_SERVER_TLS:-off}
+tls_trust_file /etc/ssl/certs/ca-certificates.crt
+logfile -
+
+account default_account
+host ${MSMTP_RELAY_SERVER_HOST:-mailhog}
+port ${MSMTP_RELAY_SERVER_PORT:-1025}
+auth ${MSMTP_RELAY_SERVER_AUTH:-off}
+user ${MSMTP_RELAY_SERVER_USER}
+password ${MSMTP_RELAY_SERVER_PASSWORD}
+from ${MSMTP_RELAY_SERVER_FROM:-no-reply@localhost}
+
+account default : default_account
+EOF
+chmod 600 /etc/msmtprc
 
 exec /usr/local/bin/docker-php-entrypoint "$@"

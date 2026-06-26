@@ -1,10 +1,13 @@
 FROM ghcr.io/aliasproject/php:8.5-frankenphp-latest
 
-RUN apk add --update --no-cache \
-    git npm
+LABEL maintainer="Michael Aguiar <mike@aliasproject.com>"
 
-# Install Composer
-RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" && \
-    php -r "if (hash_file('sha384', 'composer-setup.php') === file_get_contents('https://composer.github.io/installer.sig')) { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); exit(1); }" && \
-    php composer-setup.php --install-dir=/usr/local/bin --filename=composer && \
-    rm composer-setup.php
+# Composer binary pulled directly from the official image — no network fetch at build time
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+
+# Switch to root for system package installation, then restore the non-root user
+USER root
+
+RUN apk add --no-cache git npm
+
+USER appuser:appgroup
