@@ -155,9 +155,14 @@ jobs:
   # Images that are FROM an image build-base just pushed. needs: build-base
   # guarantees the parent manifest is on the registry before these start,
   # replacing the old sleep-based "wait for propagation" steps.
+  #
+  # build-base's aggregate result is 'failure' if ANY leg fails, even ones
+  # unrelated to a given dependent's parent - so this job must not gate on
+  # that aggregate. Each dependent leg instead fails on its own if its
+  # specific parent image wasn't actually pushed (the FROM pull will fail).
   build-dependent:
     needs: [detect-changes, build-base]
-    if: always() && needs.build-base.result != 'failure'
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

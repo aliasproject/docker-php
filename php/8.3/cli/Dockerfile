@@ -31,8 +31,7 @@ RUN apk add --no-cache \
     php83-xml \
     php83-xmlreader \
     php83-xmlwriter \
-    php83-zip && \
-    ln -s /usr/bin/php83 /usr/bin/php
+    php83-zip
 
 WORKDIR /app
 
