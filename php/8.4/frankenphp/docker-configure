@@ -30,6 +30,8 @@ from ${MSMTP_RELAY_SERVER_FROM:-no-reply@localhost}
 
 account default : default_account
 EOF
-chmod 600 /etc/msmtprc
+
+# Ensure group write access remains intact after cat overwrites the file
+chmod 660 /etc/msmtprc 2>/dev/null || true
 
 exec /usr/local/bin/docker-php-entrypoint "$@"
