@@ -2,12 +2,83 @@ FROM ghcr.io/aliasproject/php:8.4-frankenphp
 
 LABEL maintainer="Michael Aguiar <mike@aliasproject.com>"
 
+# Re-declared so this image can be given a UID independent of whatever the
+# base was built with -- the base's ARG does not carry forward to images
+# that only FROM its tag. Default matches the base, so the common case
+# (single shared UID) is a no-op.
+ARG APP_UID=1000
+
 # Switch to root to install additional PHP extensions, then restore the non-root user
 USER root
 
+# Re-key appuser to APP_UID when it differs from the base image's UID. Safe
+# to delete+recreate rather than usermod+chown: nothing in the base is
+# chown'd to appuser (shared dirs are chgrp'd to group 0 instead), so the
+# only thing at the old UID is appuser's own (empty) home directory.
+RUN if [ "${APP_UID}" != "$(id -u appuser)" ]; then \
+        deluser appuser && \
+        adduser -u ${APP_UID} -G root -s /sbin/nologin -D appuser; \
+    fi
+
+# Tier 2: backend clients and library bindings the base deliberately omits.
+#   mysqli   - WordPress still requires it; pdo_mysql alone is not enough
+#   gd/exif  - media handling
+#   imagick  - Smush / image processing. Pulls ~24 delegate libraries and has
+#              the largest CVE history of anything here; that is precisely why
+#              it is not in the base image.
+#   redis    - object cache backend
+#   igbinary - redis serializer. MUST match the CLI image or WP-CLI cannot
+#              deserialize what the web containers wrote.
+#   soap     - WooCommerce gateways / legacy APIs
 RUN install-php-extensions \
+    mysqli \
+    gd \
+    exif \
+    redis \
     igbinary \
     imagick \
     soap
 
-USER appuser:appgroup
+# ---------------------------------------------------------------------------
+# WordPress policy
+#
+# The base image supplies the mechanism (PHP_NO_EXEC_PATHS / PHP_DENY_PATHS are
+# rendered into a Caddy snippet at boot). This layer supplies the values.
+# ---------------------------------------------------------------------------
+
+# Never execute PHP from a directory WordPress can write to. Covers both the
+# Bedrock layout (/app/...) and stock WordPress (/wp-content/...), so this image
+# works for either without a per-site override.
+ENV PHP_NO_EXEC_PATHS="/app/uploads/* /app/cache/* /app/wpo-cache/* /app/upgrade/* /app/upgrade-temp-backup/* /wp-content/uploads/* /wp-content/cache/* /wp-content/upgrade/*"
+
+# Never serve these at all. readme.html and license.txt are how scanners
+# fingerprint the exact WordPress version. These are root-level exact/prefix
+# paths -- deliberately not depth-independent; see PHP_DENY_EXTENSIONS below
+# for suffix-based denials that must match anywhere in the tree.
+ENV PHP_DENY_PATHS="/.env* /.git/* /composer.json /composer.lock /wp-config.php /readme.html /license.txt /wp-config-sample.php"
+
+# Backup/dump/log files, wherever in the tree they end up (e.g. a backup
+# plugin writing into uploads/). Suffix-matched via regex so it isn't limited
+# to the document root the way a PHP_DENY_PATHS glob would be.
+ENV PHP_DENY_EXTENSIONS="sql sql.gz bak old log"
+
+# Blocks the command-execution family that webshells rely on most heavily.
+# proc_open and popen are deliberately NOT included: Composer, WP-CLI and most
+# backup plugins need them. Add them per-site if nothing on that site does.
+ENV PHP_DISABLE_FUNCTIONS="exec,passthru,shell_exec,system,pcntl_exec,dl"
+
+# WordPress sizing. WP_MEMORY_LIMIT is meaningless above the PHP limit, so this
+# must be >= whatever the site sets in wp-config/application.php.
+ENV PHP_MEMORY_LIMIT=512M \
+    PHP_UPLOAD_MAX_FILESIZE=128M \
+    PHP_POST_MAX_SIZE=128M \
+    PHP_MAX_INPUT_VARS=5000
+
+# A WordPress install with a page builder and a large plugin set runs well past
+# the 10k default; overflowing max_accelerated_files silently disables opcache
+# for whatever does not fit.
+ENV PHP_OPCACHE_MEMORY=256 \
+    PHP_OPCACHE_INTERNED_STRINGS=32 \
+    PHP_OPCACHE_MAX_FILES=50000
+
+USER appuser

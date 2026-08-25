@@ -1,0 +1,37 @@
+FROM ghcr.io/aliasproject/php:8.4-cli
+
+LABEL maintainer="Michael Aguiar <mike@aliasproject.com>"
+
+# Re-declared so this image can be given a UID independent of whatever the
+# base was built with -- must match frankenphp/Dockerfile.wordpress's APP_UID
+# for a given site, or the CLI container won't own what the web container
+# writes (uploads, cache).
+ARG APP_UID=1000
+
+USER root
+
+# Re-key appuser to APP_UID when it differs from the base image's UID. Safe
+# to delete+recreate: nothing in the base is chown'd to appuser (shared dirs
+# are chgrp'd to group 0 instead), so the only thing at the old UID is
+# appuser's own (empty) home directory.
+RUN if [ "${APP_UID}" != "$(id -u appuser)" ]; then \
+        deluser appuser && \
+        adduser -u ${APP_UID} -G root -s /sbin/nologin -D appuser; \
+    fi
+
+# Tier 2, mirroring frankenphp/Dockerfile.wordpress. Keep these two lists in
+# sync: a WP-CLI run must be able to read what the web containers wrote.
+#
+# igbinary in particular is a correctness requirement, not parity for its own
+# sake -- the redis-cache plugin can serialize with it, and a CLI without
+# igbinary silently fails to deserialize the object cache.
+RUN apk add --no-cache \
+    php84-exif \
+    php84-gd \
+    php84-mysqli \
+    php84-pecl-igbinary \
+    php84-pecl-imagick \
+    php84-pecl-redis \
+    php84-soap
+
+USER appuser

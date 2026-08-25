@@ -1,19 +1,121 @@
 #!/bin/ash
 set -e
 
-# Apply PHP ini tuning from environment
+PHP_INI_DIR="${PHP_INI_DIR:-/usr/local/etc/php}"
+CADDY_SITE_D=/config/caddy/site.d
+
+# ---------------------------------------------------------------------------
+# PHP configuration
+# ---------------------------------------------------------------------------
 {
     echo "memory_limit = ${PHP_MEMORY_LIMIT:-256M}"
     echo "max_execution_time = ${PHP_MAX_EXECUTION_TIME:-60}"
-    echo "opcache.enable = 1"
-    echo "opcache.memory_consumption = 128"
-    echo "opcache.max_accelerated_files = 10000"
-    echo "opcache.validate_timestamps = 0"
-    echo "opcache.jit = tracing"
-    echo "opcache.jit_buffer_size = 128M"
-} > $PHP_INI_DIR/conf.d/app.ini
+    echo "upload_max_filesize = ${PHP_UPLOAD_MAX_FILESIZE:-32M}"
+    echo "post_max_size = ${PHP_POST_MAX_SIZE:-32M}"
+    echo "max_input_vars = ${PHP_MAX_INPUT_VARS:-3000}"
 
-# Generate msmtp config from environment
+    # Do not advertise the PHP version in response headers
+    echo "expose_php = ${PHP_EXPOSE:-Off}"
+
+    # Cuts stat() syscalls on include-heavy apps
+    echo "realpath_cache_size = ${PHP_REALPATH_CACHE_SIZE:-4096K}"
+    echo "realpath_cache_ttl = ${PHP_REALPATH_CACHE_TTL:-600}"
+
+    echo "opcache.enable = 1"
+    echo "opcache.memory_consumption = ${PHP_OPCACHE_MEMORY:-128}"
+    echo "opcache.interned_strings_buffer = ${PHP_OPCACHE_INTERNED_STRINGS:-16}"
+    echo "opcache.max_accelerated_files = ${PHP_OPCACHE_MAX_FILES:-10000}"
+    echo "opcache.validate_timestamps = ${PHP_OPCACHE_VALIDATE_TIMESTAMPS:-0}"
+    echo "opcache.revalidate_freq = ${PHP_OPCACHE_REVALIDATE_FREQ:-2}"
+    # Fallbacks match the base Dockerfile's ENV defaults (off/0), not PHP's
+    # own defaults -- JIT has a segfault history on web workloads and the
+    # buffer is otherwise 128MB reserved per container for no benefit. If
+    # these env vars are ever missing, fall back to the hardened values, not
+    # the old insecure ones.
+    echo "opcache.jit = ${PHP_OPCACHE_JIT:-off}"
+    echo "opcache.jit_buffer_size = ${PHP_OPCACHE_JIT_BUFFER:-0}"
+
+    # WordPress reads plugin/theme metadata out of docblocks, so comments must
+    # survive compilation. Harmless elsewhere.
+    echo "opcache.save_comments = 1"
+
+    if [ -n "${PHP_DISABLE_FUNCTIONS}" ]; then
+        echo "disable_functions = ${PHP_DISABLE_FUNCTIONS}"
+    fi
+
+    if [ -n "${PHP_OPEN_BASEDIR}" ]; then
+        echo "open_basedir = ${PHP_OPEN_BASEDIR}"
+    fi
+} > "${PHP_INI_DIR}/conf.d/app.ini"
+
+# ---------------------------------------------------------------------------
+# Caddy hardening snippet (imported inside the site block, before php_server)
+#
+# Regenerated every boot. Always written, even when empty, because the
+# Caddyfile imports this directory unconditionally.
+# ---------------------------------------------------------------------------
+mkdir -p "${CADDY_SITE_D}"
+
+{
+    if [ "${CADDY_ACCESS_LOG:-on}" = "on" ]; then
+        echo "log {"
+        echo "  output file ${CADDY_ACCESS_LOG_PATH:-/data/caddy/access.log} {"
+        echo "          roll_size ${CADDY_ACCESS_LOG_ROLL_SIZE:-100MiB}"
+        echo "          roll_keep ${CADDY_ACCESS_LOG_ROLL_KEEP:-10}"
+        echo "  }"
+        echo "  format json"
+        echo "}"
+    fi
+
+    # Paths that must never be served at all (secrets, VCS, dumps, backups).
+    # Emitted as a `handle` so it shares a directive group with the no-exec
+    # blocks below and is evaluated first; `respond` would otherwise sort
+    # after them and lose to a no-exec prefix on overlapping paths
+    # (e.g. /app/uploads/wpo/logs/*.log).
+    if [ -n "${PHP_DENY_PATHS}" ]; then
+        echo "@denied path ${PHP_DENY_PATHS}"
+        echo "handle @denied {"
+        echo "  respond 404"
+        echo "}"
+    fi
+
+    # Suffix-based denials (backup/dump/log files) must match at any depth.
+    # Caddy's path matcher "*" cannot cross "/" -- "/*.sql" matches "/dump.sql"
+    # but NOT "/wp-content/uploads/dump.sql" -- and a backup dropped inside a
+    # directory that's also in PHP_NO_EXEC_PATHS would otherwise be directly
+    # downloadable via that directory's file_server. A suffix-anchored regex
+    # has no such depth limit. PHP_DENY_EXTENSIONS is space-separated,
+    # without leading dots (e.g. "sql sql.gz bak old log").
+    if [ -n "${PHP_DENY_EXTENSIONS}" ]; then
+        ext_pattern=""
+        for ext in ${PHP_DENY_EXTENSIONS}; do
+            escaped=$(printf '%s' "$ext" | sed 's/\./\\./g')
+            if [ -z "$ext_pattern" ]; then
+                ext_pattern="$escaped"
+            else
+                ext_pattern="${ext_pattern}|${escaped}"
+            fi
+        done
+        echo "@denied_ext path_regexp \\.(${ext_pattern})\$"
+        echo "handle @denied_ext {"
+        echo "  respond 404"
+        echo "}"
+    fi
+
+    # Paths the application can WRITE to must never EXECUTE. `handle` is
+    # terminal and contains only file_server, so requests matching these
+    # prefixes can never reach the PHP handler -- regardless of extension
+    # casing, directory-index resolution, or split_path/path-info tricks.
+    for p in ${PHP_NO_EXEC_PATHS}; do
+            echo "handle ${p} {"
+            echo "  file_server"
+            echo "}"
+        done
+} > "${CADDY_SITE_D}/00-hardening.caddyfile"
+
+# ---------------------------------------------------------------------------
+# msmtp
+# ---------------------------------------------------------------------------
 cat > /etc/msmtprc <<EOF
 defaults
 tls ${MSMTP_RELAY_SERVER_TLS:-off}
