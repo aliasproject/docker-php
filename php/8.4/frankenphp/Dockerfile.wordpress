@@ -15,8 +15,16 @@ USER root
 # to delete+recreate rather than usermod+chown: nothing in the base is
 # chown'd to appuser (shared dirs are chgrp'd to group 0 instead), so the
 # only thing at the old UID is appuser's own (empty) home directory.
-RUN if [ "${APP_UID}" != "$(id -u appuser)" ]; then \
-        deluser appuser && \
+# Handles appuser not existing at all as a defensive fallback -- an earlier
+# incident had this build FROM a stale/pre-hardening base image where
+# appuser didn't exist yet, which failed this step outright instead of
+# just re-keying.
+RUN if id appuser >/dev/null 2>&1; then \
+        if [ "${APP_UID}" != "$(id -u appuser)" ]; then \
+            deluser appuser && \
+            adduser -u ${APP_UID} -G root -s /sbin/nologin -D appuser; \
+        fi; \
+    else \
         adduser -u ${APP_UID} -G root -s /sbin/nologin -D appuser; \
     fi
 

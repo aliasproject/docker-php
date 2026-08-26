@@ -10,4 +10,13 @@ USER root
 
 RUN apk add --no-cache git npm
 
-USER appuser:appgroup
+# Pick up source edits without a container restart. The production default of
+# validate_timestamps=0 means opcache never re-stats a file, so edited code
+# keeps serving the old bytecode until the process dies.
+ENV PHP_OPCACHE_VALIDATE_TIMESTAMPS=1 \
+    PHP_OPCACHE_REVALIDATE_FREQ=0
+
+# Dev tooling shells out constantly; leave the exec family alone here.
+ENV PHP_DISABLE_FUNCTIONS=
+
+USER appuser

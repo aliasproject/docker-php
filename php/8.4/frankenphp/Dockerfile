@@ -41,6 +41,18 @@ RUN sed -i 's/{$SERVER_NAME:localhost}/:{$PORT:80}/' /etc/caddy/Caddyfile && \
     sed -i '/CADDY_GLOBAL_OPTIONS/a http_port {$PORT:80}' /etc/caddy/Caddyfile && \
     sed -i '/http_port/a servers :{$PORT:80} {\nprotocols h1 h2 h2c h3\n}' /etc/caddy/Caddyfile && \
     \
+    # Each sed above is a silent no-op if the upstream Caddyfile format ever
+    # changes shape on a FRANKENPHP_VERSION bump -- the build would otherwise
+    # succeed and ship an image that falls back to Caddy's automatic-HTTPS
+    # behavior for "localhost" and never binds plain HTTP on $PORT. Fail
+    # loudly instead of shipping that silently.
+    grep -qxF ':{$PORT:80} {' /etc/caddy/Caddyfile || \
+        (echo "ERROR: failed to rewrite Caddyfile site address to :{\$PORT:80}" >&2 && exit 1) && \
+    grep -qxF 'http_port {$PORT:80}' /etc/caddy/Caddyfile || \
+        (echo "ERROR: failed to insert http_port {\$PORT:80} into Caddyfile" >&2 && exit 1) && \
+    grep -qxF 'servers :{$PORT:80} {' /etc/caddy/Caddyfile || \
+        (echo "ERROR: failed to insert servers block into Caddyfile" >&2 && exit 1) && \
+    \
     # Splice in the runtime-generated hardening snippet ahead of php_server.
     # docker-configure regenerates it on every boot from PHP_NO_EXEC_PATHS /
     # PHP_DENY_PATHS / CADDY_ACCESS_LOG, which keeps this image framework-
