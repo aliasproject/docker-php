@@ -31,7 +31,7 @@ RUN if id appuser >/dev/null 2>&1; then \
 # Tier 2: backend clients and library bindings the base deliberately omits.
 #   mysqli   - WordPress still requires it; pdo_mysql alone is not enough
 #   gd/exif  - media handling
-#   imagick  - Smush / image processing. Pulls ~24 delegate libraries and has
+#   imagick  - Image processing. Pulls ~24 delegate libraries and has
 #              the largest CVE history of anything here; that is precisely why
 #              it is not in the base image.
 #   redis    - object cache backend
@@ -57,7 +57,7 @@ RUN install-php-extensions \
 # Never execute PHP from a directory WordPress can write to. Covers both the
 # Bedrock layout (/app/...) and stock WordPress (/wp-content/...), so this image
 # works for either without a per-site override.
-ENV PHP_NO_EXEC_PATHS="/app/uploads/* /app/cache/* /app/wpo-cache/* /app/upgrade/* /app/upgrade-temp-backup/* /wp-content/uploads/* /wp-content/cache/* /wp-content/upgrade/*"
+ENV PHP_NO_EXEC_PATHS="/app/uploads/* /app/cache/* /app/wpo-cache/* /app/upgrade/* /app/upgrade-temp-backup/* /wp-content/uploads/* /wp-content/cache/* /wp-content/upgrade/* /wp-content/upgrade-temp-backup/*"
 
 # Never serve these at all. readme.html and license.txt are how scanners
 # fingerprint the exact WordPress version. These are root-level exact/prefix
@@ -80,13 +80,16 @@ ENV PHP_DISABLE_FUNCTIONS="exec,passthru,shell_exec,system,pcntl_exec,dl"
 ENV PHP_MEMORY_LIMIT=512M \
     PHP_UPLOAD_MAX_FILESIZE=128M \
     PHP_POST_MAX_SIZE=128M \
-    PHP_MAX_INPUT_VARS=5000
+    PHP_MAX_INPUT_VARS=5000 \
+    PHP_MAX_EXECUTION_TIME=300
 
 # A WordPress install with a page builder and a large plugin set runs well past
 # the 10k default; overflowing max_accelerated_files silently disables opcache
 # for whatever does not fit.
 ENV PHP_OPCACHE_MEMORY=256 \
     PHP_OPCACHE_INTERNED_STRINGS=32 \
-    PHP_OPCACHE_MAX_FILES=50000
+    PHP_OPCACHE_MAX_FILES=50000 \
+    PHP_OPCACHE_VALIDATE_TIMESTAMPS=1 \
+    PHP_OPCACHE_REVALIDATE_FREQ=60
 
 USER appuser
