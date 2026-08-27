@@ -66,17 +66,17 @@ RUN sed -i 's/{$SERVER_NAME:localhost}/:{$PORT:80}/' /etc/caddy/Caddyfile && \
     cp $PHP_INI_DIR/php.ini-production $PHP_INI_DIR/php.ini && \
     # Wire up msmtp as the PHP mailer (path is fixed at build time)
     sed -i -r 's|;sendmail_path =.*|sendmail_path = "/usr/bin/msmtp -t"|g' $PHP_INI_DIR/php.ini && \
+    # Tier 1: the PHP runtime itself, plus pdo_mysql as the generic modern
+    # driver (mysqlnd is already compiled in, so the shim costs ~0 bytes).
+    # Anything that picks a backend or wraps an external library -- mysqli,
+    # redis, gd, exif, imagick, soap, igbinary -- belongs in a derived image.
     install-php-extensions \
         pdo_mysql \
-        mysqli \
-        redis \
-        gd \
         zip \
         intl \
         bcmath \
         pcntl \
-        posix \
-        exif && \
+        posix && \
     \
     # 1. Create unprivileged user assigned to Group 0 (root group)
     adduser -u ${APP_UID} -G root -s /sbin/nologin -D appuser && \
@@ -108,6 +108,14 @@ RUN sed -i 's/{$SERVER_NAME:localhost}/:{$PORT:80}/' /etc/caddy/Caddyfile && \
 
 # COPY after RUN so script edits don't bust the extension-install layer
 COPY --chmod=755 docker-configure /usr/local/bin/docker-configure
+
+# Composer binary pulled directly from the official image — no network fetch
+# at build time (same as Dockerfile.dev). Not a runtime extension: it never
+# loads into a FrankenPHP worker or touches a request, so it adds no
+# request-time attack surface — it's a build-time CLI tool nearly every
+# composer-managed PHP app (Laravel, Symfony, etc.) needs available when
+# source is deployed without its own Dockerfile.
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 
 EXPOSE 80 443 443/udp
 

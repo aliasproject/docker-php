@@ -28,7 +28,21 @@ RUN if id appuser >/dev/null 2>&1; then \
         adduser -u ${APP_UID} -G root -s /sbin/nologin -D appuser; \
     fi
 
+# Tier 2: backend clients and library bindings the base deliberately omits.
+#   mysqli   - WordPress still requires it; pdo_mysql alone is not enough
+#   gd/exif  - media handling
+#   imagick  - Smush / image processing. Pulls ~24 delegate libraries and has
+#              the largest CVE history of anything here; that is precisely why
+#              it is not in the base image.
+#   redis    - object cache backend
+#   igbinary - redis serializer. MUST match the CLI image or WP-CLI cannot
+#              deserialize what the web containers wrote.
+#   soap     - WooCommerce gateways / legacy APIs
 RUN install-php-extensions \
+    mysqli \
+    gd \
+    exif \
+    redis \
     igbinary \
     imagick \
     soap

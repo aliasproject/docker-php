@@ -114,6 +114,14 @@ RUN sed -i 's/{$SERVER_NAME:localhost}/:{$PORT:80}/' /etc/caddy/Caddyfile && \
 # COPY after RUN so script edits don't bust the extension-install layer
 COPY --chmod=755 docker-configure /usr/local/bin/docker-configure
 
+# Composer binary pulled directly from the official image — no network fetch
+# at build time (same as Dockerfile.dev). Not a runtime extension: it never
+# loads into a FrankenPHP worker or touches a request, so it adds no
+# request-time attack surface — it's a build-time CLI tool nearly every
+# composer-managed PHP app (Laravel, Symfony, etc.) needs available when
+# source is deployed without its own Dockerfile.
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+
 EXPOSE 80 443 443/udp
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
