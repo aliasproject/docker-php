@@ -28,6 +28,7 @@ ENV PHP_MEMORY_LIMIT=256M \
     PHP_OPCACHE_JIT=off \
     PHP_OPCACHE_JIT_BUFFER=0 \
     PHP_NO_EXEC_PATHS= \
+    PHP_NO_EXEC_HIDE_EXTENSIONS="php phtml phar phps php3 php4 php5 php6 php7 php8 inc" \
     PHP_DENY_PATHS= \
     PHP_DENY_EXTENSIONS= \
     CADDY_ACCESS_LOG=on \
