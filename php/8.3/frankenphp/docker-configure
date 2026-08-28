@@ -56,6 +56,22 @@ CADDY_SITE_D=/config/caddy/site.d
 # ---------------------------------------------------------------------------
 mkdir -p "${CADDY_SITE_D}"
 
+# Build a regex alternation from a space-separated extension list, escaping
+# dots: "sql sql.gz bak" -> "sql|sql\.gz|bak". Used both for the global
+# suffix denials and for hiding source inside no-exec paths below.
+ext_alternation() {
+    _pattern=""
+    for _ext in $1; do
+        _escaped=$(printf '%s' "$_ext" | sed 's/\./\\./g')
+        if [ -z "$_pattern" ]; then
+            _pattern="$_escaped"
+        else
+            _pattern="${_pattern}|${_escaped}"
+        fi
+    done
+    printf '%s' "$_pattern"
+}
+
 {
     if [ "${CADDY_ACCESS_LOG:-on}" = "on" ]; then
         echo "log {"
@@ -87,15 +103,7 @@ mkdir -p "${CADDY_SITE_D}"
     # has no such depth limit. PHP_DENY_EXTENSIONS is space-separated,
     # without leading dots (e.g. "sql sql.gz bak old log").
     if [ -n "${PHP_DENY_EXTENSIONS}" ]; then
-        ext_pattern=""
-        for ext in ${PHP_DENY_EXTENSIONS}; do
-            escaped=$(printf '%s' "$ext" | sed 's/\./\\./g')
-            if [ -z "$ext_pattern" ]; then
-                ext_pattern="$escaped"
-            else
-                ext_pattern="${ext_pattern}|${escaped}"
-            fi
-        done
+        ext_pattern=$(ext_alternation "${PHP_DENY_EXTENSIONS}")
         echo "@denied_ext path_regexp \\.(${ext_pattern})\$"
         echo "handle @denied_ext {"
         echo "  respond 404"
@@ -106,8 +114,21 @@ mkdir -p "${CADDY_SITE_D}"
     # terminal and contains only file_server, so requests matching these
     # prefixes can never reach the PHP handler -- regardless of extension
     # casing, directory-index resolution, or split_path/path-info tricks.
+    hide_pattern=$(ext_alternation "${PHP_NO_EXEC_HIDE_EXTENSIONS}")
+
     for p in ${PHP_NO_EXEC_PATHS}; do
             echo "handle ${p} {"
+            # A no-exec path is a directory the app can WRITE to. Blocking
+            # execution but still serving the bytes leaves any .php dropped
+            # there downloadable as source: an attacker can confirm a webshell
+            # survived, and any config a plugin generates under uploads/ leaks
+            # its credentials. 404 rather than 403 so existence isn't
+            # confirmed. Case-insensitive because file_server would otherwise
+            # happily serve "SHELL.PHP".
+            if [ -n "$hide_pattern" ]; then
+                echo "  @src path_regexp (?i)\\.(${hide_pattern})\$"
+                echo "  respond @src 404"
+            fi
             echo "  file_server"
             echo "}"
         done
