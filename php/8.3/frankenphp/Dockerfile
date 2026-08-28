@@ -120,7 +120,7 @@ COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 EXPOSE 80 443 443/udp
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD wget -qO /dev/null http://localhost:2019/config/ || exit 1
+    CMD wget -qO /dev/null http://127.0.0.1:2019/config/ || exit 1
 
 WORKDIR /var/www/html
 
