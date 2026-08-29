@@ -57,7 +57,7 @@ RUN install-php-extensions \
 # Never execute PHP from a directory WordPress can write to. Covers both the
 # Bedrock layout (/app/...) and stock WordPress (/wp-content/...), so this image
 # works for either without a per-site override.
-ENV PHP_NO_EXEC_PATHS="/app/uploads/* /app/cache/* /app/wpo-cache/* /app/upgrade/* /app/upgrade-temp-backup/* /wp-content/uploads/* /wp-content/cache/* /wp-content/upgrade/* /wp-content/upgrade-temp-backup/*"
+ENV PHP_NO_EXEC_PATHS="/app/uploads/* /app/cache/* /app/wpo-cache/* /app/upgrade/* /app/upgrade-temp-backup/* /wp-content/uploads/* /wp-content/cache/* /wp-content/upgrade/* /wp-content/upgrade-temp-backup/* /app/plugins/* /app/themes/* /app/mu-plugins/* /wp/wp-includes/* /wp-content/plugins/* /wp-content/themes/* /wp-content/mu-plugins/*"
 
 # Never serve these at all. readme.html and license.txt are how scanners
 # fingerprint the exact WordPress version. These are root-level exact/prefix
