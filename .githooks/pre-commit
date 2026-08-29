@@ -1,0 +1,15 @@
+#!/bin/sh
+# Scans staged changes for secrets before allowing a commit. Same tool as
+# .github/workflows/secret-scan.yml, run locally so a leak never gets
+# committed at all instead of just being caught on push.
+#
+# One-time setup: `git config core.hooksPath .githooks`
+# Requires the gitleaks CLI: https://github.com/gitleaks/gitleaks#installing
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+    echo "gitleaks is not installed -- skipping local secret scan (CI will still catch it)."
+    echo "Install: https://github.com/gitleaks/gitleaks#installing"
+    exit 0
+fi
+
+gitleaks protect --staged --redact --verbose
