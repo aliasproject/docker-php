@@ -91,14 +91,14 @@ RUN sed -i 's/{$SERVER_NAME:localhost}/:{$PORT:80}/' /etc/caddy/Caddyfile && \
     setcap CAP_NET_BIND_SERVICE=+eip /usr/local/bin/frankenphp && \
     \
     # 2. Provision runtime directories and assign permissions to Group 0 (GID 0)
-    mkdir -p /config/caddy/site.d /data/caddy /var/www/html $PHP_INI_DIR/conf.d && \
+    mkdir -p /config/caddy/site.d /data/caddy /app $PHP_INI_DIR/conf.d && \
     touch /etc/msmtprc && \
     \
     # Assign group ownership to Group 0 (root group)
     chgrp -R 0 \
         /config/caddy \
         /data/caddy \
-        /var/www/html \
+        /app \
         $PHP_INI_DIR/conf.d \
         /etc/msmtprc && \
     \
@@ -108,7 +108,7 @@ RUN sed -i 's/{$SERVER_NAME:localhost}/:{$PORT:80}/' /etc/caddy/Caddyfile && \
     chmod -R g=u \
         /config/caddy \
         /data/caddy \
-        /var/www/html \
+        /app \
         $PHP_INI_DIR/conf.d && \
     chmod 660 /etc/msmtprc
 
@@ -128,7 +128,7 @@ EXPOSE 80 443 443/udp
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD wget -qO /dev/null http://127.0.0.1:2019/config/ || exit 1
 
-WORKDIR /var/www/html
+WORKDIR /app
 
 # 3. Run default execution as APP_UID and GID 0
 USER ${APP_UID}:0
