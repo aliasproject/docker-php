@@ -1,0 +1,21 @@
+FROM ghcr.io/aliasproject/php:8.2-frankenphp-wordpress
+
+LABEL maintainer="Michael Aguiar <mike@aliasproject.com>"
+
+# Switch to root for system package installation, then restore the non-root user
+USER root
+
+RUN apk add --no-cache git npm
+
+# Pick up source edits without a container restart. The WordPress base already
+# validates timestamps but revalidates only every 60s; drop that to 0 for
+# immediate pickup, same as Dockerfile.dev does over the plain base.
+ENV PHP_OPCACHE_VALIDATE_TIMESTAMPS=1 \
+    PHP_OPCACHE_REVALIDATE_FREQ=0
+
+# Dev tooling (composer, wp-cli, npm scripts) shells out constantly; the
+# WordPress base disables exec/passthru/etc for hardening, which breaks that
+# locally. Composer itself is already present via the base image.
+ENV PHP_DISABLE_FUNCTIONS=
+
+USER appuser

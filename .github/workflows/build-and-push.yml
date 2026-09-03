@@ -88,18 +88,22 @@ jobs:
             php/8.2/frankenphp/Dockerfile
             php/8.2/frankenphp/Dockerfile.dev
             php/8.2/frankenphp/Dockerfile.wordpress
+            php/8.2/frankenphp/Dockerfile.wordpress-dev
             php/8.3/cli/Dockerfile
             php/8.3/frankenphp/Dockerfile
             php/8.3/frankenphp/Dockerfile.dev
             php/8.3/frankenphp/Dockerfile.wordpress
+            php/8.3/frankenphp/Dockerfile.wordpress-dev
             php/8.4/cli/Dockerfile
             php/8.4/frankenphp/Dockerfile
             php/8.4/frankenphp/Dockerfile.dev
             php/8.4/frankenphp/Dockerfile.wordpress
+            php/8.4/frankenphp/Dockerfile.wordpress-dev
             php/8.5/cli/Dockerfile
             php/8.5/frankenphp/Dockerfile
             php/8.5/frankenphp/Dockerfile.dev
             php/8.5/frankenphp/Dockerfile.wordpress
+            php/8.5/frankenphp/Dockerfile.wordpress-dev
 
   # Images with no in-repo FROM dependency - safe to build fully in parallel.
   # The frankenphp images live in their own build-frankenphp-base job below:
@@ -349,22 +353,30 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { version: "8.2", variant: dev,       file: Dockerfile.dev,       arch: amd64, force_input: build_php_82 }
-          - { version: "8.2", variant: dev,       file: Dockerfile.dev,       arch: arm64, force_input: build_php_82 }
-          - { version: "8.2", variant: wordpress, file: Dockerfile.wordpress, arch: amd64, force_input: build_php_82 }
-          - { version: "8.2", variant: wordpress, file: Dockerfile.wordpress, arch: arm64, force_input: build_php_82 }
-          - { version: "8.3", variant: dev,       file: Dockerfile.dev,       arch: amd64, force_input: build_php_83 }
-          - { version: "8.3", variant: dev,       file: Dockerfile.dev,       arch: arm64, force_input: build_php_83 }
-          - { version: "8.3", variant: wordpress, file: Dockerfile.wordpress, arch: amd64, force_input: build_php_83 }
-          - { version: "8.3", variant: wordpress, file: Dockerfile.wordpress, arch: arm64, force_input: build_php_83 }
-          - { version: "8.4", variant: dev,       file: Dockerfile.dev,       arch: amd64, force_input: build_php_84 }
-          - { version: "8.4", variant: dev,       file: Dockerfile.dev,       arch: arm64, force_input: build_php_84 }
-          - { version: "8.4", variant: wordpress, file: Dockerfile.wordpress, arch: amd64, force_input: build_php_84 }
-          - { version: "8.4", variant: wordpress, file: Dockerfile.wordpress, arch: arm64, force_input: build_php_84 }
-          - { version: "8.5", variant: dev,       file: Dockerfile.dev,       arch: amd64, force_input: build_php_85 }
-          - { version: "8.5", variant: dev,       file: Dockerfile.dev,       arch: arm64, force_input: build_php_85 }
-          - { version: "8.5", variant: wordpress, file: Dockerfile.wordpress, arch: amd64, force_input: build_php_85 }
-          - { version: "8.5", variant: wordpress, file: Dockerfile.wordpress, arch: arm64, force_input: build_php_85 }
+          - { version: "8.2", variant: dev,           file: Dockerfile.dev,           arch: amd64, force_input: build_php_82 }
+          - { version: "8.2", variant: dev,           file: Dockerfile.dev,           arch: arm64, force_input: build_php_82 }
+          - { version: "8.2", variant: wordpress,     file: Dockerfile.wordpress,     arch: amd64, force_input: build_php_82 }
+          - { version: "8.2", variant: wordpress,     file: Dockerfile.wordpress,     arch: arm64, force_input: build_php_82 }
+          - { version: "8.2", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: amd64, force_input: build_php_82 }
+          - { version: "8.2", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: arm64, force_input: build_php_82 }
+          - { version: "8.3", variant: dev,           file: Dockerfile.dev,           arch: amd64, force_input: build_php_83 }
+          - { version: "8.3", variant: dev,           file: Dockerfile.dev,           arch: arm64, force_input: build_php_83 }
+          - { version: "8.3", variant: wordpress,     file: Dockerfile.wordpress,     arch: amd64, force_input: build_php_83 }
+          - { version: "8.3", variant: wordpress,     file: Dockerfile.wordpress,     arch: arm64, force_input: build_php_83 }
+          - { version: "8.3", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: amd64, force_input: build_php_83 }
+          - { version: "8.3", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: arm64, force_input: build_php_83 }
+          - { version: "8.4", variant: dev,           file: Dockerfile.dev,           arch: amd64, force_input: build_php_84 }
+          - { version: "8.4", variant: dev,           file: Dockerfile.dev,           arch: arm64, force_input: build_php_84 }
+          - { version: "8.4", variant: wordpress,     file: Dockerfile.wordpress,     arch: amd64, force_input: build_php_84 }
+          - { version: "8.4", variant: wordpress,     file: Dockerfile.wordpress,     arch: arm64, force_input: build_php_84 }
+          - { version: "8.4", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: amd64, force_input: build_php_84 }
+          - { version: "8.4", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: arm64, force_input: build_php_84 }
+          - { version: "8.5", variant: dev,           file: Dockerfile.dev,           arch: amd64, force_input: build_php_85 }
+          - { version: "8.5", variant: dev,           file: Dockerfile.dev,           arch: arm64, force_input: build_php_85 }
+          - { version: "8.5", variant: wordpress,     file: Dockerfile.wordpress,     arch: amd64, force_input: build_php_85 }
+          - { version: "8.5", variant: wordpress,     file: Dockerfile.wordpress,     arch: arm64, force_input: build_php_85 }
+          - { version: "8.5", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: amd64, force_input: build_php_85 }
+          - { version: "8.5", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: arm64, force_input: build_php_85 }
     steps:
       - name: Checkout code
         if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
@@ -421,14 +433,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { version: "8.2", variant: dev,       force_input: build_php_82 }
-          - { version: "8.2", variant: wordpress, force_input: build_php_82 }
-          - { version: "8.3", variant: dev,       force_input: build_php_83 }
-          - { version: "8.3", variant: wordpress, force_input: build_php_83 }
-          - { version: "8.4", variant: dev,       force_input: build_php_84 }
-          - { version: "8.4", variant: wordpress, force_input: build_php_84 }
-          - { version: "8.5", variant: dev,       force_input: build_php_85 }
-          - { version: "8.5", variant: wordpress, force_input: build_php_85 }
+          - { version: "8.2", variant: dev,           force_input: build_php_82 }
+          - { version: "8.2", variant: wordpress,     force_input: build_php_82 }
+          - { version: "8.2", variant: wordpress-dev, force_input: build_php_82 }
+          - { version: "8.3", variant: dev,           force_input: build_php_83 }
+          - { version: "8.3", variant: wordpress,     force_input: build_php_83 }
+          - { version: "8.3", variant: wordpress-dev, force_input: build_php_83 }
+          - { version: "8.4", variant: dev,           force_input: build_php_84 }
+          - { version: "8.4", variant: wordpress,     force_input: build_php_84 }
+          - { version: "8.4", variant: wordpress-dev, force_input: build_php_84 }
+          - { version: "8.5", variant: dev,           force_input: build_php_85 }
+          - { version: "8.5", variant: wordpress,     force_input: build_php_85 }
+          - { version: "8.5", variant: wordpress-dev, force_input: build_php_85 }
     steps:
       - name: Download digests
         if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
