@@ -21,7 +21,7 @@ CADDY_SITE_D=/config/caddy/site.d
     echo "realpath_cache_size = ${PHP_REALPATH_CACHE_SIZE:-4096K}"
     echo "realpath_cache_ttl = ${PHP_REALPATH_CACHE_TTL:-600}"
 
-    echo "opcache.enable = 1"
+    echo "opcache.enable = ${PHP_OPCACHE_ENABLE:-1}"
     echo "opcache.memory_consumption = ${PHP_OPCACHE_MEMORY:-128}"
     echo "opcache.interned_strings_buffer = ${PHP_OPCACHE_INTERNED_STRINGS:-16}"
     echo "opcache.max_accelerated_files = ${PHP_OPCACHE_MAX_FILES:-10000}"

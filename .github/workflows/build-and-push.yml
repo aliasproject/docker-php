@@ -89,21 +89,25 @@ jobs:
             php/8.2/frankenphp/Dockerfile.dev
             php/8.2/frankenphp/Dockerfile.wordpress
             php/8.2/frankenphp/Dockerfile.wordpress-dev
+            php/8.2/frankenphp/docker-configure
             php/8.3/cli/Dockerfile
             php/8.3/frankenphp/Dockerfile
             php/8.3/frankenphp/Dockerfile.dev
             php/8.3/frankenphp/Dockerfile.wordpress
             php/8.3/frankenphp/Dockerfile.wordpress-dev
+            php/8.3/frankenphp/docker-configure
             php/8.4/cli/Dockerfile
             php/8.4/frankenphp/Dockerfile
             php/8.4/frankenphp/Dockerfile.dev
             php/8.4/frankenphp/Dockerfile.wordpress
             php/8.4/frankenphp/Dockerfile.wordpress-dev
+            php/8.4/frankenphp/docker-configure
             php/8.5/cli/Dockerfile
             php/8.5/frankenphp/Dockerfile
             php/8.5/frankenphp/Dockerfile.dev
             php/8.5/frankenphp/Dockerfile.wordpress
             php/8.5/frankenphp/Dockerfile.wordpress-dev
+            php/8.5/frankenphp/docker-configure
 
   # Images with no in-repo FROM dependency - safe to build fully in parallel.
   # The frankenphp images live in their own build-frankenphp-base job below:
@@ -191,15 +195,15 @@ jobs:
           - { version: "8.5", arch: arm64, force_input: build_php_85 }
     steps:
       - name: Checkout code
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
@@ -208,7 +212,7 @@ jobs:
 
       - name: Build and push by digest (${{ matrix.version }}, ${{ matrix.arch }})
         id: build
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/build-push-action@v7
         with:
           context: php/${{ matrix.version }}/frankenphp
@@ -219,14 +223,14 @@ jobs:
           cache-to: type=gha,mode=max,scope=8.${{ matrix.version }}-frankenphp-${{ matrix.arch }}
 
       - name: Export digest
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         run: |
           mkdir -p /tmp/digests
           digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
 
       - name: Upload digest
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/upload-artifact@v4
         with:
           name: digest-fpbase-${{ matrix.version }}-${{ matrix.arch }}
@@ -254,7 +258,7 @@ jobs:
           - { version: "8.5", force_input: build_php_85 }
     steps:
       - name: Download digests
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
@@ -262,11 +266,11 @@ jobs:
           merge-multiple: true
 
       - name: Set up Docker Buildx
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
@@ -274,7 +278,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create manifest list and push
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         working-directory: /tmp/digests
         run: |
           docker buildx imagetools create \
@@ -379,15 +383,15 @@ jobs:
           - { version: "8.5", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: arm64, force_input: build_php_85 }
     steps:
       - name: Checkout code
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
@@ -396,7 +400,7 @@ jobs:
 
       - name: Build and push by digest (${{ matrix.version }}-${{ matrix.variant }}, ${{ matrix.arch }})
         id: build
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/build-push-action@v7
         with:
           context: php/${{ matrix.version }}/frankenphp
@@ -407,14 +411,14 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.version }}-frankenphp-${{ matrix.variant }}-${{ matrix.arch }}
 
       - name: Export digest
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         run: |
           mkdir -p /tmp/digests
           digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
 
       - name: Upload digest
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/upload-artifact@v4
         with:
           name: digest-fpdep-${{ matrix.version }}-${{ matrix.variant }}-${{ matrix.arch }}
@@ -447,7 +451,7 @@ jobs:
           - { version: "8.5", variant: wordpress-dev, force_input: build_php_85 }
     steps:
       - name: Download digests
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
@@ -455,11 +459,11 @@ jobs:
           merge-multiple: true
 
       - name: Set up Docker Buildx
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
@@ -467,7 +471,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create manifest list and push
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) }}
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         working-directory: /tmp/digests
         run: |
           docker buildx imagetools create \
