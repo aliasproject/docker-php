@@ -75,6 +75,14 @@ ENV PHP_DENY_EXTENSIONS="sql sql.gz bak old log"
 # backup plugins need them. Add them per-site if nothing on that site does.
 ENV PHP_DISABLE_FUNCTIONS="exec,passthru,shell_exec,system,pcntl_exec,dl"
 
+# Static asset caching (rendered into a Caddy snippet at boot). Covers both
+# layouts. Core, plugin and theme assets carry ?ver= in their URLs, and cache
+# plugins / the Avada compiler write content-hashed files, so a change is always
+# a new URL: cache those for a year. Media library files keep their filename if
+# replaced in place, so they get 30 days. Both are per-site overridable; "*"
+# matches one path segment (multisite uploads/sites/N/).
+ENV CADDY_IMMUTABLE_ASSET_PATHS="/wp/wp-includes/ /wp/wp-admin/ /app/plugins/ /app/themes/ /app/mu-plugins/ /app/cache/ /app/uploads/fusion-styles/ /app/uploads/fusion-scripts/ /app/uploads/sites/*/fusion-styles/ /app/uploads/sites/*/fusion-scripts/ /wp-includes/ /wp-admin/ /wp-content/plugins/ /wp-content/themes/ /wp-content/mu-plugins/ /wp-content/cache/ /wp-content/uploads/fusion-styles/ /wp-content/uploads/fusion-scripts/ /wp-content/uploads/sites/*/fusion-styles/ /wp-content/uploads/sites/*/fusion-scripts/"     CADDY_MEDIA_PATHS="/app/uploads/ /wp-content/uploads/"
+
 # WordPress sizing. WP_MEMORY_LIMIT is meaningless above the PHP limit, so this
 # must be >= whatever the site sets in wp-config/application.php.
 ENV PHP_MEMORY_LIMIT=512M \

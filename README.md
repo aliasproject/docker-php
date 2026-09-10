@@ -31,6 +31,25 @@ docker pull ghcr.io/aliasproject/php:8.4-frankenphp
 
 Every image is configurable via environment variables — `PHP_MEMORY_LIMIT`, `PHP_OPCACHE_*`, `PHP_UPLOAD_MAX_FILESIZE`, etc. — see each Dockerfile's `ENV` block for the defaults.
 
+## Static asset caching
+
+Caddy's `file_server` sends no `Cache-Control` by default, so browsers revalidate every asset on every visit and a CDN in front (Cloudflare, etc.) falls back to a short edge TTL and revalidates against the origin from every PoP. Every `frankenphp` variant can render a Caddy snippet at boot that fixes this. Nothing is emitted unless at least one path list is set, so the base image is unaffected until you opt in:
+
+- `CADDY_IMMUTABLE_ASSET_PATHS` — space-separated path prefixes whose files are content-hashed or carry a version in the URL (a Vite/Mix build dir, `?ver=` assets, minifier output). A change always means a new URL, so they are served with `public, max-age=31536000, immutable` (`CADDY_IMMUTABLE_ASSET_MAX_AGE`).
+- `CADDY_MEDIA_PATHS` — user uploads, which keep their filename when replaced in place. Served with `public, max-age=2592000` (`CADDY_MEDIA_MAX_AGE`) so a stale copy is bounded.
+- `CADDY_IMMUTABLE_ASSET_EXTENSIONS` / `CADDY_MEDIA_EXTENSIONS` — space-separated, no dots; sensible defaults for CSS/JS/fonts/images and for images/video/PDF respectively.
+
+`*` in a prefix matches a single path segment. The header is only applied when the file exists on disk, so 404s are never cached long-term, and HTML, PHP and JSON responses are untouched.
+
+```sh
+# Laravel with a Vite build and user uploads on the public disk
+docker run -e CADDY_IMMUTABLE_ASSET_PATHS="/build/" \
+           -e CADDY_MEDIA_PATHS="/storage/" \
+           ghcr.io/aliasproject/php:8.4-frankenphp
+```
+
+The `wordpress` variant sets both lists out of the box (see below).
+
 ## WordPress hardening
 
 The `frankenphp:wordpress` variant renders a Caddy hardening snippet at container boot:
@@ -41,3 +60,5 @@ The `frankenphp:wordpress` variant renders a Caddy hardening snippet at containe
 - Runs as a non-root user (UID configurable via `--build-arg APP_UID`) in group `0`.
 
 All of the above are overridable via environment variables if a site needs different values.
+
+The `wordpress` variant also ships defaults for the [static asset caching](#static-asset-caching) snippet covering both the Bedrock (`/app/...`, `/wp/...`) and stock (`/wp-content/...`, `/wp-includes/...`) layouts, including cache-plugin output and Avada's compiled `fusion-styles` / `fusion-scripts` directories.

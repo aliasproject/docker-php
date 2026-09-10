@@ -135,6 +135,67 @@ ext_alternation() {
 } > "${CADDY_SITE_D}/00-hardening.caddyfile"
 
 # ---------------------------------------------------------------------------
+# Caddy cache-control snippet for static assets
+#
+# Only rendered when a path list is set (the base image sets none; the
+# WordPress layer supplies both layouts). Two tiers:
+#   CADDY_IMMUTABLE_ASSET_PATHS -- prefixes whose files are content-hashed or
+#       carry ?ver= in their URLs (core, plugins, themes, minifier/compiler
+#       output). A change always means a new URL, so cache for a year.
+#   CADDY_MEDIA_PATHS -- media library uploads, which keep their filename when
+#       replaced in place. A shorter TTL bounds how long a stale copy lives.
+# Both are space-separated path prefixes; "*" matches one path segment
+# (e.g. /app/uploads/sites/*/fusion-styles/). Extension lists are
+# space-separated without leading dots. The `file` matcher restricts the
+# header to files that exist on disk, so a 404 is never cached long-term.
+# Without these headers Cloudflare falls back to a short edge TTL and every
+# PoP revalidates against the origin independently.
+# ---------------------------------------------------------------------------
+
+# Space-separated path prefixes -> regex alternation. Escapes "." and "+",
+# turns "*" into a single-segment wildcard.
+path_alternation() {
+    _pattern=""
+    for _p in $1; do
+        _escaped=$(printf '%s' "$_p" | sed -e 's|[.+]|\\&|g' -e 's|\*|[^/]+|g')
+        if [ -z "$_pattern" ]; then
+            _pattern="$_escaped"
+        else
+            _pattern="${_pattern}|${_escaped}"
+        fi
+    done
+    printf '%s' "$_pattern"
+}
+
+if [ -n "${CADDY_IMMUTABLE_ASSET_PATHS}" ] || [ -n "${CADDY_MEDIA_PATHS}" ]; then
+    {
+        if [ -n "${CADDY_IMMUTABLE_ASSET_PATHS}" ]; then
+            path_pattern=$(path_alternation "${CADDY_IMMUTABLE_ASSET_PATHS}")
+            ext_pattern=$(ext_alternation "${CADDY_IMMUTABLE_ASSET_EXTENSIONS:-css js mjs woff woff2 ttf otf eot svg png jpg jpeg gif webp avif ico}")
+            echo "@immutable_assets {"
+            echo "  path_regexp ^(${path_pattern}).*\\.(${ext_pattern})\$"
+            echo "  file"
+            echo "}"
+            echo "header @immutable_assets Cache-Control \"public, max-age=${CADDY_IMMUTABLE_ASSET_MAX_AGE:-31536000}, immutable\""
+        fi
+
+        if [ -n "${CADDY_MEDIA_PATHS}" ]; then
+            path_pattern=$(path_alternation "${CADDY_MEDIA_PATHS}")
+            ext_pattern=$(ext_alternation "${CADDY_MEDIA_EXTENSIONS:-png jpg jpeg gif webp avif svg ico mp4 webm mp3 pdf woff woff2 ttf otf}")
+            echo "@media_assets {"
+            echo "  path_regexp ^(${path_pattern}).*\\.(${ext_pattern})\$"
+            echo "  file"
+            echo "}"
+            echo "header @media_assets Cache-Control \"public, max-age=${CADDY_MEDIA_MAX_AGE:-2592000}\""
+        fi
+    } > "${CADDY_SITE_D}/10-cache-headers.caddyfile"
+else
+    # A site that clears both lists must not inherit a stale snippet from a
+    # previous boot of the same container filesystem.
+    rm -f "${CADDY_SITE_D}/10-cache-headers.caddyfile"
+fi
+
+# ---------------------------------------------------------------------------
 # msmtp
 # ---------------------------------------------------------------------------
 cat > /etc/msmtprc <<EOF
