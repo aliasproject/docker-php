@@ -18,4 +18,104 @@ ENV PHP_OPCACHE_VALIDATE_TIMESTAMPS=1 \
 # locally. Composer itself is already present via the base image.
 ENV PHP_DISABLE_FUNCTIONS=
 
+# `alios share` support. WordPress stores its URL in the database, so a site
+# reached through a share tunnel redirects every visitor back to
+# https://<project>.test. The alios share vhost marks tunnelled requests with
+# `X-Alios-Share: 1`. For those requests only, this prepend file serves
+# WordPress from the forwarded public host by filtering home/siteurl. It also
+# rewrites the stored host in the response body (post content, srcsets, JSON)
+# and in Location headers. Requests without the header, including every normal
+# .test request and WP-CLI, are untouched. Nothing is written to the project,
+# and it only exists in this dev image, so it can never reach production.
+# Inline (not a COPY'd file) so editing it triggers this image's CI rebuild.
+COPY --chmod=644 <<'PHP' /usr/local/lib/php/alios-share.php
+<?php
+(function () {
+    if (empty($_SERVER['HTTP_X_ALIOS_SHARE'])) {
+        return;
+    }
+
+    $host = strtolower(trim(explode(',', $_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? '')[0]));
+    if (!preg_match('/^[a-z0-9.-]+(:[0-9]+)?$/', $host)) {
+        return;
+    }
+
+    $shared = 'https://' . $host;
+    $_SERVER['HTTP_HOST'] = $host;
+    $_SERVER['HTTPS'] = 'on';
+
+    // Hosts the site is configured with (from the DB or WP_HOME/WP_SITEURL),
+    // collected as WordPress reads them so they can be rewritten on output.
+    $originals = [];
+
+    // Swap the scheme+host of home/siteurl for the shared origin, keeping any
+    // path (Bedrock's siteurl is https://<project>.test/wp).
+    $swap = function ($value) use ($shared, $host, &$originals) {
+        if (!is_string($value) || $value === '') {
+            return $value;
+        }
+        $parts = parse_url($value);
+        if (empty($parts['host'])) {
+            return $value;
+        }
+        $original = $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : '');
+        if (strtolower($original) !== $host) {
+            $originals[$original] = true;
+        }
+        return $shared . ($parts['path'] ?? '');
+    };
+
+    // Registered before WordPress loads, via its pre-initialized hooks
+    // support. The late priority runs after core's _config_wp_home /
+    // _config_wp_siteurl, so this also wins over WP_HOME / WP_SITEURL defines.
+    foreach (['option_home', 'option_siteurl'] as $hook) {
+        $GLOBALS['wp_filter'][$hook][9999][] = ['function' => $swap, 'accepted_args' => 1];
+    }
+
+    // Point absolute (and JSON-escaped) links at the shared host, upgrading
+    // http:// since the tunnel is https-only and content saved before the
+    // site had SSL would otherwise be blocked as mixed content.
+    $rewrite = function ($text) use ($host, &$originals) {
+        $from = [];
+        $to = [];
+        foreach (array_keys($originals) as $original) {
+            foreach (['http', 'https'] as $scheme) {
+                $from[] = $scheme . '://' . $original;
+                $to[] = 'https://' . $host;
+                $from[] = $scheme . ':\/\/' . $original;
+                $to[] = 'https:\/\/' . $host;
+            }
+            $from[] = '//' . $original;
+            $to[] = '//' . $host;
+        }
+        return str_ireplace($from, $to, $text);
+    };
+
+    ob_start(function ($buffer) use ($rewrite, &$originals) {
+        if (!$originals || $buffer === '') {
+            return $buffer;
+        }
+        foreach (headers_list() as $header) {
+            if (stripos($header, 'content-type:') === 0
+                && !preg_match('#(text/|json|javascript|xml)#i', $header)) {
+                return $buffer;
+            }
+        }
+        return $rewrite($buffer);
+    });
+
+    header_register_callback(function () use ($rewrite) {
+        foreach (headers_list() as $header) {
+            if (stripos($header, 'location:') === 0) {
+                header('Location: ' . $rewrite(trim(substr($header, 9))));
+            }
+        }
+        // The body may have changed length after rewriting.
+        header_remove('Content-Length');
+    });
+})();
+PHP
+
+RUN echo "auto_prepend_file = /usr/local/lib/php/alios-share.php" > "$PHP_INI_DIR/conf.d/zz-alios-share.ini"
+
 USER appuser

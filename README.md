@@ -62,3 +62,14 @@ The `frankenphp:wordpress` variant renders a Caddy hardening snippet at containe
 All of the above are overridable via environment variables if a site needs different values.
 
 The `wordpress` variant also ships defaults for the [static asset caching](#static-asset-caching) snippet covering both the Bedrock (`/app/...`, `/wp/...`) and stock (`/wp-content/...`, `/wp-includes/...`) layouts, including cache-plugin output and Avada's compiled `fusion-styles` / `fusion-scripts` directories.
+
+## Sharing a local WordPress site (`wordpress-dev` only)
+
+WordPress stores its URL in the database, so a site reached through an [`alios share`](https://github.com/aliasproject/alios-cli) tunnel would redirect every visitor back to `https://<project>.test`. The `wordpress-dev` variant ships a PHP `auto_prepend_file` (`/usr/local/lib/php/alios-share.php`) that fixes this without touching the project.
+
+It only activates when the request carries `X-Alios-Share: 1`. The alios share vhost sets that header itself, so visitors can't forge or strip it. For those requests it:
+
+- filters `home` / `siteurl` to the forwarded public host, keeping any path (e.g. Bedrock's `/wp`). This wins over `WP_HOME` / `WP_SITEURL` defines.
+- rewrites the site's stored host to the public one in HTML, JSON, JS, CSS and XML responses and in `Location` headers. That covers post content, `srcset`s and REST output, and upgrades `http://` links to `https://`.
+
+Requests without the header, including every normal `.test` request and WP-CLI, are untouched. The production `wordpress` variant doesn't include it.
