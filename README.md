@@ -1,18 +1,18 @@
 # docker-php
 
-Docker images for PHP, published to `ghcr.io/aliasproject/php`. The primary offering is [FrankenPHP](https://frankenphp.dev/) (Caddy + PHP) for 8.2–8.5, plus CLI images for the same versions. Older FPM-based images (7.4–8.2) remain published for existing consumers but are being phased out in favor of FrankenPHP.
+Docker images for PHP, published to `ghcr.io/aliasproject/php`. The primary offering is [FrankenPHP](https://frankenphp.dev/) (Caddy + PHP) for 8.2–8.5, plus CLI images for the same versions. CLI images are also published for 7.4–8.1.
 
 ## Image matrix
 
-| PHP  | CLI | FPM              | FPM + nginx | FrankenPHP | FrankenPHP (dev) | FrankenPHP (WordPress) |
-|------|:---:|:----------------:|:-----------:|:----------:|:-----------------:|:------------------------:|
-| 7.4  | ✅  | ✅               | ✅          |            |                    |                          |
-| 8.0  | ✅  | ✅ alpine/ubuntu | ✅          |            |                    |                          |
-| 8.1  | ✅  | ✅               | ✅          |            |                    |                          |
-| 8.2  |     | ✅               | ✅          | ✅         | ✅                 | ✅                       |
-| 8.3  | ✅  |                  |             | ✅         | ✅                 | ✅                       |
-| 8.4  | ✅  |                  |             | ✅         | ✅                 | ✅                       |
-| 8.5  | ✅  |                  |             | ✅         | ✅                 | ✅                       |
+| PHP  | CLI | FrankenPHP | FrankenPHP (dev) | FrankenPHP (WordPress) |
+|------|:---:|:----------:|:-----------------:|:------------------------:|
+| 7.4  | ✅  |            |                    |                          |
+| 8.0  | ✅  |            |                    |                          |
+| 8.1  | ✅  |            |                    |                          |
+| 8.2  |     | ✅         | ✅                 | ✅                       |
+| 8.3  | ✅  | ✅         | ✅                 | ✅                       |
+| 8.4  | ✅  | ✅         | ✅                 | ✅                       |
+| 8.5  | ✅  | ✅         | ✅                 | ✅                       |
 
 Tags follow `<version>-<variant>` (e.g. `8.4-frankenphp-wordpress`), each also published as `-latest` and pinned to a commit as `-<sha>`.
 
@@ -23,8 +23,6 @@ docker pull ghcr.io/aliasproject/php:8.4-frankenphp
 ## Variants
 
 - **cli** — Alpine + the PHP CLI SAPI and a minimal extension set (`pdo_mysql`, `bcmath`, `pcntl`, `posix`, etc.), unlimited execution time, runs as an unprivileged `appuser` in group `0`.
-- **fpm** *(legacy)* — PHP-FPM under s6-overlay, configurable pool sizing via `PHP_PM_*` env vars.
-- **fpm-nginx** *(legacy)* — the `fpm` image plus nginx in front of it.
 - **frankenphp** — FrankenPHP serves PHP directly through Caddy; no separate web server. Minimal extension set, non-root by default, mail sent through `msmtp`, Composer baked in, `HEALTHCHECK` against Caddy's admin API.
 - **frankenphp (dev)** — the FrankenPHP base with extra extensions (`mysqli`, `gd`, `exif`, `imagick`, `redis`, `igbinary`, `soap`) for local development.
 - **frankenphp (wordpress)** — the FrankenPHP base with the same extensions as `dev`, plus a hardening policy suited to running WordPress (see below).
