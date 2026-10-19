@@ -1,6 +1,6 @@
 # docker-php
 
-Docker images for PHP, published to `ghcr.io/aliasproject/php`. The primary offering is [FrankenPHP](https://frankenphp.dev/) (Caddy + PHP) for 8.2–8.5, plus CLI images for the same versions. CLI images are also published for 7.4–8.1.
+Docker images for PHP, published to `ghcr.io/aliasproject/php`. The primary offering is [FrankenPHP](https://frankenphp.dev/) (Caddy + PHP) for 8.2–8.5, plus CLI images for 7.4–8.1 and 8.3–8.5.
 
 ## Image matrix
 
