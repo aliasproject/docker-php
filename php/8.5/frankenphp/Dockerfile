@@ -1,86 +1,8 @@
-ARG FRANKENPHP_VERSION=1.13.1
+ARG FRANKENPHP_VERSION=1.13.2
 ARG PHP_VERSION=8.5
-# PHP security release to rebuild over the upstream image's PHP, for when
-# upstream (php:*-zts-alpine -> dunglas/frankenphp) lags a php.net release.
-# Hash from https://www.php.net/releases/index.php?json&version=8.5.
-# Once the FROM image ships this version or newer (the php-patched stage
-# then fails the build), remove the php-patched stage, these PHP_PATCH_*
-# ARGs, and the ARG/COPY/ENV block after LABEL in the final stage.
-ARG PHP_PATCH_VERSION=8.5.12
-ARG PHP_PATCH_SHA256=08bc2eba2a588654ade1357174aa646b761556c862dda0678345ee29ed481209
-
-# Rebuilds PHP from the patched tarball using the upstream image's own
-# configure flags (read back from php-config) and the docker-library build
-# recipe, then stages `make install` into /php-install. FrankenPHP links
-# libphp.so dynamically and a patch release keeps the same API numbers, so
-# swapping libphp.so, the binaries and the shared extensions is enough.
-FROM dunglas/frankenphp:${FRANKENPHP_VERSION}-php${PHP_VERSION}-alpine AS php-patched
-ARG PHP_PATCH_VERSION
-ARG PHP_PATCH_SHA256
-RUN set -eux; \
-    # Copying this build over a base that already has the same or a newer
-    # PHP would silently downgrade it.
-    php -r 'exit(version_compare(PHP_VERSION, getenv("PHP_PATCH_VERSION"), "<") ? 0 : 1);' || \
-        { echo "ERROR: base already ships PHP $(php -r 'echo PHP_VERSION;'); remove the php-patched stage" >&2; exit 1; }; \
-    \
-    # 8.4+ record PHP_UNAME='Linux - Docker' unquoted; drop it so the word
-    # split at ./configure doesn't break it apart (it's re-added there).
-    configure_opts="$(php-config --configure-options | sed 's/ PHP_UNAME=Linux - Docker//')"; \
-    case "$configure_opts" in *PHP_UNAME=*) \
-        echo "ERROR: unexpected PHP_UNAME in configure options: $configure_opts" >&2; exit 1;; \
-    esac; \
-    apk add --no-cache --virtual .build-deps \
-        $PHPIZE_DEPS \
-        argon2-dev \
-        coreutils \
-        curl-dev \
-        gnu-libiconv-dev \
-        libsodium-dev \
-        libxml2-dev \
-        linux-headers \
-        oniguruma-dev \
-        openssl-dev \
-        readline-dev \
-        sqlite-dev; \
-    # make sure musl's iconv doesn't get used (matches docker-library)
-    rm -vf /usr/include/iconv.h; \
-    \
-    mkdir -p /php-install/usr/src "/php-install$PHP_INI_DIR"; \
-    curl -fsSL -o /php-install/usr/src/php.tar.xz "https://www.php.net/distributions/php-${PHP_PATCH_VERSION}.tar.xz"; \
-    curl -fsSL -o /php-install/usr/src/php.tar.xz.asc "https://www.php.net/distributions/php-${PHP_PATCH_VERSION}.tar.xz.asc"; \
-    echo "${PHP_PATCH_SHA256} */php-install/usr/src/php.tar.xz" | sha256sum -c -; \
-    mkdir /usr/src/php; \
-    tar -Jxf /php-install/usr/src/php.tar.xz -C /usr/src/php --strip-components=1; \
-    cd /usr/src/php; \
-    \
-    export \
-        CFLAGS="$PHP_CFLAGS" \
-        CPPFLAGS="$PHP_CPPFLAGS" \
-        LDFLAGS="$PHP_LDFLAGS" \
-        PHP_BUILD_PROVIDER='https://github.com/docker-library/php'; \
-    # word splitting of configure_opts is intended
-    ./configure $configure_opts PHP_UNAME='Linux - Docker'; \
-    make -j "$(nproc)"; \
-    find -type f -name '*.a' -delete; \
-    make install INSTALL_ROOT=/php-install; \
-    find /php-install/usr/local -type f -perm '/0111' \
-        -exec sh -euxc 'strip --strip-all "$@" || :' -- '{}' +; \
-    cp -v php.ini-* "/php-install$PHP_INI_DIR/"; \
-    \
-    test "$(/php-install/usr/local/bin/php -n -r 'echo PHP_VERSION;')" = "$PHP_PATCH_VERSION"
-
 FROM dunglas/frankenphp:${FRANKENPHP_VERSION}-php${PHP_VERSION}-alpine
 
 LABEL maintainer="Michael Aguiar <mike@aliasproject.com>"
-
-ARG PHP_PATCH_VERSION
-ARG PHP_PATCH_SHA256
-# Only usr/: PEAR's installer also drops registry dotfiles at INSTALL_ROOT.
-COPY --from=php-patched /php-install/usr/ /usr/
-ENV PHP_VERSION=${PHP_PATCH_VERSION} \
-    PHP_URL=https://www.php.net/distributions/php-${PHP_PATCH_VERSION}.tar.xz \
-    PHP_ASC_URL=https://www.php.net/distributions/php-${PHP_PATCH_VERSION}.tar.xz.asc \
-    PHP_SHA256=${PHP_PATCH_SHA256}
 
 # Runtime UID. Keep this DIFFERENT from the UID that owns the bind-mounted
 # source on the host: if they match, PHP owns every file it serves and any
@@ -117,9 +39,9 @@ ENV PHP_MEMORY_LIMIT=256M \
     MSMTP_RELAY_SERVER_TLS=off \
     MSMTP_RELAY_SERVER_FROM=no-reply@localhost
 
-    # Fail the build rather than ship the vulnerable PHP if the patched
-    # libphp/binaries didn't land over the upstream ones. `frankenphp
-    # php-cli` runs the libphp.so the server embeds; `php` is its own binary.
+# Fail the build if the PHP the server embeds doesn't match the image's
+# PHP_VERSION. `frankenphp php-cli` runs the libphp.so the server embeds;
+# `php` is its own binary.
 RUN for bin in "frankenphp php-cli" php; do \
         v="$($bin -r 'echo PHP_VERSION;')"; \
         test "$v" = "$PHP_VERSION" || { echo "ERROR: $bin reports $v, expected $PHP_VERSION" >&2; exit 1; }; \
