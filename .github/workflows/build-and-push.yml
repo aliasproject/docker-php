@@ -101,10 +101,11 @@ jobs:
             php/8.5/frankenphp/docker-configure
 
   # Images with no in-repo FROM dependency - safe to build fully in parallel.
-  # The frankenphp images live in their own build-frankenphp-base job below:
-  # every one of these still finishes in well under a minute (confirmed from
-  # actual run logs), so there's nothing to gain from the digest-split/native
-  # -arm64 treatment frankenphp needs - it would only add job overhead here.
+  # The frankenphp images live in their own build-frankenphp-base job below.
+  # The 8.3-8.5 cli images compile their extensions (install-php-extensions on
+  # the official php images), which is slower under QEMU for arm64; if these
+  # legs become the bottleneck, give them the digest-split/native-arm64
+  # treatment frankenphp has.
   build-base:
     needs: detect-changes
     runs-on: ubuntu-latest
