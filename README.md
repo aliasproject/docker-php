@@ -22,7 +22,7 @@ docker pull ghcr.io/aliasproject/php:8.4-frankenphp
 
 ## Variants
 
-- **cli** — the PHP CLI with unlimited execution time. 8.3–8.5 are built on the official `php:<version>-cli-alpine` images, so they get php.net patch releases as soon as those images do (7.4–8.1 still use Alpine's EOL packages). 8.4 has a minimal extension set (`pdo_mysql`, `bcmath`, `intl`, `pcntl`, `zip`, etc.) and runs as an unprivileged `appuser` in group `0`; 8.3 and 8.5 also include `gd`, `exif`, `imagick`, `mysqli`, `redis` and `igbinary`, and run as root.
+- **cli** — the PHP CLI with unlimited execution time. 8.3–8.5 are built on the official `php:<version>-cli-alpine` images, so a rebuild picks up the latest php.net patch release (7.4–8.1 still use Alpine's EOL packages). Images are only rebuilt when their Dockerfile changes or the workflow is run by hand. PHP's ini files are in `/usr/local/etc/php` (`conf.d/` for overrides). 8.4 has a minimal extension set (`pdo_mysql`, `bcmath`, `intl`, `pcntl`, `zip`, etc.) and runs as an unprivileged `appuser` in group `0`. 8.3 and 8.5 have a different set (`bcmath`, `pcntl`, `pdo_mysql`, `zip` plus `gd`, `exif`, `imagick`, `mysqli`, `redis`, `igbinary`, `msgpack` and `sockets`, but not `intl`) and run as root.
 - **frankenphp** — FrankenPHP serves PHP directly through Caddy; no separate web server. Minimal extension set, non-root by default, mail sent through `msmtp`, Composer baked in, `HEALTHCHECK` against Caddy's admin API.
 - **frankenphp (dev)** — the FrankenPHP base with extra extensions (`mysqli`, `gd`, `exif`, `imagick`, `redis`, `igbinary`, `soap`) for local development.
 - **frankenphp (wordpress)** — the FrankenPHP base with the same extensions as `dev`, plus a hardening policy suited to running WordPress (see below).

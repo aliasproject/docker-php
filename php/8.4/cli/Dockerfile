@@ -1,7 +1,7 @@
 # Official image: it tracks php.net patch releases, where Alpine's stable
-# branches can sit on one PHP patch release for months, and it is the same
-# PHP build the frankenphp images use (php:*-zts-alpine under
-# dunglas/frankenphp), so CLI and web containers run the same PHP.
+# branches can sit on one PHP patch release for months. The frankenphp images
+# are built on the same images (the ZTS variant, php:*-zts-alpine), so CLI and
+# web containers get PHP from the same source and build recipe.
 FROM php:8.4-cli-alpine
 
 LABEL maintainer="Michael Aguiar <mike@aliasproject.com>"
@@ -29,16 +29,15 @@ RUN apk add --no-cache tzdata && \
     cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" && \
     # CLI tasks (search-replace, imports, exports) blow past the 128M default.
     # max_execution_time 0 = unlimited, which is the CLI SAPI norm.
-    printf 'memory_limit = 512M\nmax_execution_time = 0\ndate.timezone = UTC\n' \
+    # The socket paths are the ones the Alpine-package image this replaced
+    # used; without them mysqlnd falls back to /tmp/mysql.sock.
+    printf 'memory_limit = 512M\nmax_execution_time = 0\ndate.timezone = UTC\nmysqli.default_socket = /run/mysqld/mysqld.sock\npdo_mysql.default_socket = /run/mysqld/mysqld.sock\n' \
         > "$PHP_INI_DIR/conf.d/99-cli.ini" && \
     \
     # The Alpine-package images this replaced had PHP at /usr/bin/php and
     # /usr/bin/php84; keep both working for scripts that call them.
     ln -s /usr/local/bin/php /usr/bin/php && \
     ln -s /usr/local/bin/php /usr/bin/php84 && \
-    \
-    # The CGI and debugger SAPIs are ~20MB each and unused in a CLI image.
-    rm /usr/local/bin/php-cgi /usr/local/bin/phpdbg && \
     \
     # Match the frankenphp images: unprivileged UID in group 0
     adduser -u ${APP_UID} -G root -s /sbin/nologin -D appuser && \
