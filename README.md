@@ -56,7 +56,7 @@ docker run -e PHP_NO_EXEC_PATHS="/storage/*" \
            ghcr.io/aliasproject/php:8.4-frankenphp
 ```
 
-Requests for PHP source under that path (any case, e.g. `shell.PHP`, or with trailing path info, e.g. `shell.php/foo`) return 404 or 400 and never execute; images and other files in the directory are still served, so `public/storage` uploads keep working. Add more writable paths space-separated (`PHP_NO_EXEC_PATHS="/storage/* /uploads/*"`). `PHP_NO_EXEC_PATHS` replaces the default rather than appending, so a derived image or `docker run` that sets it must list every path it wants protected.
+Requests for PHP source under that path (any case, e.g. `shell.PHP`, or with trailing path info, e.g. `shell.php/foo`) never execute: they return 404 or 400, or (with a trailing slash) redirect to a URL that returns 404. Images and other files in the directory are still served, so `public/storage` uploads keep working. The rule covers only the URL path `/storage/`; if the app serves uploads or other writable files from another public path, add it too, space-separated (`PHP_NO_EXEC_PATHS="/storage/* /uploads/*"`). `PHP_NO_EXEC_PATHS` replaces the default rather than appending, so a derived image or `docker run` that sets it must list every path it wants protected.
 
 ## WordPress hardening
 
