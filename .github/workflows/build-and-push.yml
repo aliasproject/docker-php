@@ -6,31 +6,16 @@ on:
   # Weekly rebuild, so updates to the base images (new php.net patch
   # releases in the official php images; rebuilds of the pinned
   # dunglas/frankenphp version) and Alpine package fixes reach the tags
-  # without a Dockerfile change. Scheduled runs build everything except the
-  # EOL cli images (each build condition checks github.event_name) and skip
-  # the layer cache (no-cache on each build step). A new FrankenPHP release
-  # still needs FRANKENPHP_VERSION bumped by hand.
+  # without a Dockerfile change. Scheduled runs build everything (each
+  # build condition checks github.event_name) and skip the layer cache
+  # (no-cache on each build step). A new FrankenPHP release still needs
+  # FRANKENPHP_VERSION bumped by hand.
   schedule:
     - cron: "0 10 * * 1" # Mondays 10:00 UTC
   workflow_dispatch:
     inputs:
       force_build_all:
         description: "Force build all images (ignore changed files)"
-        required: false
-        default: false
-        type: boolean
-      build_php_74:
-        description: "Force build PHP 7.4 images"
-        required: false
-        default: false
-        type: boolean
-      build_php_80:
-        description: "Force build PHP 8.0 images"
-        required: false
-        default: false
-        type: boolean
-      build_php_81:
-        description: "Force build PHP 8.1 images"
         required: false
         default: false
         type: boolean
@@ -82,9 +67,6 @@ jobs:
         uses: tj-actions/changed-files@v47
         with:
           files: |
-            php/7.4/cli/Dockerfile
-            php/8.0/cli/Dockerfile
-            php/8.1/cli/Dockerfile
             php/8.2/frankenphp/Dockerfile
             php/8.2/frankenphp/Dockerfile.dev
             php/8.2/frankenphp/Dockerfile.wordpress
@@ -125,9 +107,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: 7.4-cli,        context: php/7.4/cli,        file: php/7.4/cli/Dockerfile,        platforms: "linux/amd64,linux/arm64", force_input: build_php_74, tag: 7.4-cli, eol: true }
-          - { name: 8.0-cli,        context: php/8.0/cli,        file: php/8.0/cli/Dockerfile,        platforms: "linux/amd64,linux/arm64", force_input: build_php_80, tag: 8.0-cli, eol: true }
-          - { name: 8.1-cli,        context: php/8.1/cli,        file: php/8.1/cli/Dockerfile,        platforms: "linux/amd64,linux/arm64", force_input: build_php_81, tag: 8.1-cli, eol: true }
           - { name: 8.3-cli,        context: php/8.3/cli,        file: php/8.3/cli/Dockerfile,        platforms: "linux/amd64,linux/arm64", force_input: build_php_83, tag: 8.3-cli }
           - { name: 8.4-cli,        context: php/8.4/cli,        file: php/8.4/cli/Dockerfile,        platforms: "linux/amd64,linux/arm64", force_input: build_php_84, tag: 8.4-cli }
           - { name: 8.5-cli,        context: php/8.5/cli,        file: php/8.5/cli/Dockerfile,        platforms: "linux/amd64,linux/arm64", force_input: build_php_85, tag: 8.5-cli }
@@ -150,9 +129,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push ${{ matrix.name }}
-        # EOL images (eol: true) skip the weekly rebuild: their Alpine branches get
-        # no updates, so it would only re-push identical images.
-        if: ${{ inputs.force_build_all || (github.event_name == 'schedule' && !matrix.eol) || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, matrix.file) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, matrix.file) }}
         uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
@@ -610,9 +587,6 @@ jobs:
           echo "**Registry:** \`ghcr.io/${{ github.repository }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Available Images:**" >> $GITHUB_STEP_SUMMARY
-          echo "- **PHP 7.4:** \`7.4-cli-latest\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **PHP 8.0:** \`8.0-cli-latest\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **PHP 8.1:** \`8.1-cli-latest\`" >> $GITHUB_STEP_SUMMARY
           echo "- **PHP 8.2:** \`8.2-frankenphp-latest\`, \`8.2-frankenphp-dev-latest\`, \`8.2-frankenphp-wordpress-latest\`" >> $GITHUB_STEP_SUMMARY
           echo "- **PHP 8.3:** \`8.3-cli-latest\`, \`8.3-frankenphp-latest\`, \`8.3-frankenphp-dev-latest\`, \`8.3-frankenphp-wordpress-latest\`" >> $GITHUB_STEP_SUMMARY
           echo "- **PHP 8.4:** \`8.4-cli-latest\`, \`8.4-frankenphp-latest\`, \`8.4-frankenphp-dev-latest\`, \`8.4-frankenphp-wordpress-latest\`" >> $GITHUB_STEP_SUMMARY
