@@ -127,23 +127,39 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push ${{ matrix.name }}
+      # Pushed by digest only (no tags yet): the image has to boot before it
+      # gets the floating tags, same as the frankenphp images below.
+      - name: Build and push by digest ${{ matrix.name }}
+        id: build
         if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, matrix.file) }}
         uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
-          push: true
           platforms: ${{ matrix.platforms }}
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }}-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }}-${{ github.sha }}
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
           # Scheduled runs rebuild from scratch: a cached layer would keep
           # last week's Alpine packages whenever the base image is unchanged.
           no-cache: ${{ github.event_name == 'schedule' }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+      - name: Smoke test ${{ matrix.name }}
+        if: ${{ steps.build.outcome == 'success' }}
+        run: |
+          tag="${{ matrix.tag }}"
+          .github/scripts/smoke-test.sh cli \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}" \
+            "${tag%%-*}"
+
+      - name: Tag ${{ matrix.name }}
+        if: ${{ steps.build.outcome == 'success' }}
+        run: |
+          docker buildx imagetools create \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }}-latest \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }}-${{ github.sha }} \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
 
   # frankenphp base images, split by architecture across two native runners
   # instead of one QEMU multi-platform build. Measured from a real run: the
@@ -240,17 +256,18 @@ jobs:
       # Exact artifact names: a missing arch fails here rather than
       # publishing a single-arch tag.
       - name: Download digest (amd64)
+        id: digest_amd64
         if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/download-artifact@v4
         with:
-          path: /tmp/digests
+          path: /tmp/digests/amd64
           name: digest-fpbase-${{ matrix.version }}-amd64
 
       - name: Download digest (arm64)
         if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/download-artifact@v4
         with:
-          path: /tmp/digests
+          path: /tmp/digests/arm64
           name: digest-fpbase-${{ matrix.version }}-arm64
 
       - name: Set up Docker Buildx
@@ -265,17 +282,38 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Boot the amd64 image (the runner's own architecture) before it gets
+      # any tag. A failure here leaves the existing floating tags untouched,
+      # and holds back the images built FROM this one (their jobs need this
+      # one to succeed).
+      - name: Checkout smoke test script
+        if: ${{ steps.digest_amd64.outcome == 'success' }}
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
+
+      - name: Smoke test (amd64)
+        if: ${{ steps.digest_amd64.outcome == 'success' }}
+        run: |
+          .github/scripts/smoke-test.sh "base" \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:$(find /tmp/digests/amd64 -type f -printf '%f')" \
+            "${{ matrix.version }}"
+
       - name: Create manifest list and push
         if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         working-directory: /tmp/digests
         run: |
-          # Exactly one amd64 and one arm64 digest.
-          test "$(ls | wc -l)" -eq 2
+          # Exactly one amd64 and one arm64 digest (file name = digest).
+          test "$(find amd64 -type f | wc -l)" -eq 1
+          test "$(find arm64 -type f | wc -l)" -eq 1
+          amd64=$(find amd64 -type f -printf '%f')
+          arm64=$(find arm64 -type f -printf '%f')
           docker buildx imagetools create \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-latest \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-${{ github.sha }} \
-            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:${amd64}" \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:${arm64}"
 
   # frankenphp-dev and frankenphp-wordpress, same digest-split/native-arm64
   # treatment as build-frankenphp-base and for the same reason: both FROM
@@ -398,17 +436,18 @@ jobs:
       # wordpress that glob also matched wordpress-dev's digests, so the
       # -wordpress tags also carried the dev images.
       - name: Download digest (amd64)
+        id: digest_amd64
         if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/download-artifact@v4
         with:
-          path: /tmp/digests
+          path: /tmp/digests/amd64
           name: digest-fpdep-${{ matrix.version }}-${{ matrix.variant }}-amd64
 
       - name: Download digest (arm64)
         if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/download-artifact@v4
         with:
-          path: /tmp/digests
+          path: /tmp/digests/arm64
           name: digest-fpdep-${{ matrix.version }}-${{ matrix.variant }}-arm64
 
       - name: Set up Docker Buildx
@@ -423,17 +462,38 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Boot the amd64 image (the runner's own architecture) before it gets
+      # any tag. A failure here leaves the existing floating tags untouched,
+      # and holds back the images built FROM this one (their jobs need this
+      # one to succeed).
+      - name: Checkout smoke test script
+        if: ${{ steps.digest_amd64.outcome == 'success' }}
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
+
+      - name: Smoke test (amd64)
+        if: ${{ steps.digest_amd64.outcome == 'success' }}
+        run: |
+          .github/scripts/smoke-test.sh "${{ matrix.variant }}" \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:$(find /tmp/digests/amd64 -type f -printf '%f')" \
+            "${{ matrix.version }}"
+
       - name: Create manifest list and push
         if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         working-directory: /tmp/digests
         run: |
-          # Exactly one amd64 and one arm64 digest.
-          test "$(ls | wc -l)" -eq 2
+          # Exactly one amd64 and one arm64 digest (file name = digest).
+          test "$(find amd64 -type f | wc -l)" -eq 1
+          test "$(find arm64 -type f | wc -l)" -eq 1
+          amd64=$(find amd64 -type f -printf '%f')
+          arm64=$(find arm64 -type f -printf '%f')
           docker buildx imagetools create \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-${{ matrix.variant }} \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-${{ matrix.variant }}-latest \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-${{ matrix.variant }}-${{ github.sha }} \
-            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:${amd64}" \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:${arm64}"
 
   # wordpress-dev is FROM -wordpress, so it builds only after
   # merge-frankenphp-dependent has published that tag. In the same matrix
@@ -537,17 +597,18 @@ jobs:
       # Exact artifact names: a missing arch fails here rather than
       # publishing a single-arch tag.
       - name: Download digest (amd64)
+        id: digest_amd64
         if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/download-artifact@v4
         with:
-          path: /tmp/digests
+          path: /tmp/digests/amd64
           name: digest-fpdep-${{ matrix.version }}-${{ matrix.variant }}-amd64
 
       - name: Download digest (arm64)
         if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/download-artifact@v4
         with:
-          path: /tmp/digests
+          path: /tmp/digests/arm64
           name: digest-fpdep-${{ matrix.version }}-${{ matrix.variant }}-arm64
 
       - name: Set up Docker Buildx
@@ -562,17 +623,36 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Boot the amd64 image (the runner's own architecture) before it gets
+      # any tag. A failure here leaves the existing floating tags untouched.
+      - name: Checkout smoke test script
+        if: ${{ steps.digest_amd64.outcome == 'success' }}
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
+
+      - name: Smoke test (amd64)
+        if: ${{ steps.digest_amd64.outcome == 'success' }}
+        run: |
+          .github/scripts/smoke-test.sh "${{ matrix.variant }}" \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:$(find /tmp/digests/amd64 -type f -printf '%f')" \
+            "${{ matrix.version }}"
+
       - name: Create manifest list and push
         if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         working-directory: /tmp/digests
         run: |
-          # Exactly one amd64 and one arm64 digest.
-          test "$(ls | wc -l)" -eq 2
+          # Exactly one amd64 and one arm64 digest (file name = digest).
+          test "$(find amd64 -type f | wc -l)" -eq 1
+          test "$(find arm64 -type f | wc -l)" -eq 1
+          amd64=$(find amd64 -type f -printf '%f')
+          arm64=$(find arm64 -type f -printf '%f')
           docker buildx imagetools create \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-${{ matrix.variant }} \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-${{ matrix.variant }}-latest \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-${{ matrix.variant }}-${{ github.sha }} \
-            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:${amd64}" \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:${arm64}"
 
   summary:
     runs-on: ubuntu-latest
