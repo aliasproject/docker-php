@@ -3,6 +3,15 @@ name: Build and Push Docker Images
 on:
   push:
     branches: [main]
+  # Weekly rebuild, so updates to the base images (new php.net patch
+  # releases in the official php images; rebuilds of the pinned
+  # dunglas/frankenphp version) and Alpine package fixes reach the tags
+  # without a Dockerfile change. Scheduled runs build everything except the
+  # EOL cli images (each build condition checks github.event_name) and skip
+  # the layer cache (no-cache on each build step). A new FrankenPHP release
+  # still needs FRANKENPHP_VERSION bumped by hand.
+  schedule:
+    - cron: "0 10 * * 1" # Mondays 10:00 UTC
   workflow_dispatch:
     inputs:
       force_build_all:
@@ -116,9 +125,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: 7.4-cli,        context: php/7.4/cli,        file: php/7.4/cli/Dockerfile,        platforms: "linux/amd64,linux/arm64", force_input: build_php_74, tag: 7.4-cli }
-          - { name: 8.0-cli,        context: php/8.0/cli,        file: php/8.0/cli/Dockerfile,        platforms: "linux/amd64,linux/arm64", force_input: build_php_80, tag: 8.0-cli }
-          - { name: 8.1-cli,        context: php/8.1/cli,        file: php/8.1/cli/Dockerfile,        platforms: "linux/amd64,linux/arm64", force_input: build_php_81, tag: 8.1-cli }
+          - { name: 7.4-cli,        context: php/7.4/cli,        file: php/7.4/cli/Dockerfile,        platforms: "linux/amd64,linux/arm64", force_input: build_php_74, tag: 7.4-cli, eol: true }
+          - { name: 8.0-cli,        context: php/8.0/cli,        file: php/8.0/cli/Dockerfile,        platforms: "linux/amd64,linux/arm64", force_input: build_php_80, tag: 8.0-cli, eol: true }
+          - { name: 8.1-cli,        context: php/8.1/cli,        file: php/8.1/cli/Dockerfile,        platforms: "linux/amd64,linux/arm64", force_input: build_php_81, tag: 8.1-cli, eol: true }
           - { name: 8.3-cli,        context: php/8.3/cli,        file: php/8.3/cli/Dockerfile,        platforms: "linux/amd64,linux/arm64", force_input: build_php_83, tag: 8.3-cli }
           - { name: 8.4-cli,        context: php/8.4/cli,        file: php/8.4/cli/Dockerfile,        platforms: "linux/amd64,linux/arm64", force_input: build_php_84, tag: 8.4-cli }
           - { name: 8.5-cli,        context: php/8.5/cli,        file: php/8.5/cli/Dockerfile,        platforms: "linux/amd64,linux/arm64", force_input: build_php_85, tag: 8.5-cli }
@@ -141,7 +150,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push ${{ matrix.name }}
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, matrix.file) }}
+        # EOL images (eol: true) skip the weekly rebuild: their Alpine branches get
+        # no updates, so it would only re-push identical images.
+        if: ${{ inputs.force_build_all || (github.event_name == 'schedule' && !matrix.eol) || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, matrix.file) }}
         uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
@@ -152,6 +163,9 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }}-latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }}-${{ github.sha }}
+          # Scheduled runs rebuild from scratch: a cached layer would keep
+          # last week's Alpine packages whenever the base image is unchanged.
+          no-cache: ${{ github.event_name == 'schedule' }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
@@ -182,15 +196,15 @@ jobs:
           - { version: "8.5", arch: arm64, force_input: build_php_85 }
     steps:
       - name: Checkout code
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
@@ -199,25 +213,28 @@ jobs:
 
       - name: Build and push by digest (${{ matrix.version }}, ${{ matrix.arch }})
         id: build
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/build-push-action@v7
         with:
           context: php/${{ matrix.version }}/frankenphp
           file: php/${{ matrix.version }}/frankenphp/Dockerfile
           platforms: linux/${{ matrix.arch }}
           outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          # Scheduled runs rebuild from scratch: a cached layer would keep
+          # last week's Alpine packages whenever the base image is unchanged.
+          no-cache: ${{ github.event_name == 'schedule' }}
           cache-from: type=gha,scope=8.${{ matrix.version }}-frankenphp-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=8.${{ matrix.version }}-frankenphp-${{ matrix.arch }}
 
       - name: Export digest
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         run: |
           mkdir -p /tmp/digests
           digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
 
       - name: Upload digest
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/upload-artifact@v4
         with:
           name: digest-fpbase-${{ matrix.version }}-${{ matrix.arch }}
@@ -247,25 +264,25 @@ jobs:
       # Exact artifact names: a missing arch fails here rather than
       # publishing a single-arch tag.
       - name: Download digest (amd64)
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
           name: digest-fpbase-${{ matrix.version }}-amd64
 
       - name: Download digest (arm64)
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
           name: digest-fpbase-${{ matrix.version }}-arm64
 
       - name: Set up Docker Buildx
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
@@ -273,7 +290,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create manifest list and push
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         working-directory: /tmp/digests
         run: |
           # Exactly one amd64 and one arm64 digest.
@@ -293,7 +310,11 @@ jobs:
   # unrelated fast cli legs.
   build-frankenphp-dependent:
     needs: [detect-changes, merge-frankenphp-base]
-    if: ${{ !cancelled() }}
+    # Only on a parent that this run published: a scheduled run's -<sha> tags
+    # already exist from an earlier run, so a failed parent would otherwise
+    # leave the child building on last week's image. Over-conservative on
+    # purpose: one version's failure holds back the others' children too.
+    if: ${{ !cancelled() && needs.merge-frankenphp-base.result == 'success' }}
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     permissions:
       contents: read
@@ -320,15 +341,15 @@ jobs:
           - { version: "8.5", variant: wordpress,     file: Dockerfile.wordpress,     arch: arm64, force_input: build_php_85 }
     steps:
       - name: Checkout code
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
@@ -337,7 +358,7 @@ jobs:
 
       - name: Build and push by digest (${{ matrix.version }}-${{ matrix.variant }}, ${{ matrix.arch }})
         id: build
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/build-push-action@v7
         with:
           context: php/${{ matrix.version }}/frankenphp
@@ -345,7 +366,8 @@ jobs:
           # Build FROM the parent published for this commit (its -<sha> tag),
           # not whatever the floating tag pointed at when this leg started: if
           # no run at this commit published the parent, this fails instead of
-          # building on a stale image. The parent always rebuilds when this
+          # building on a stale image (on a scheduled run the tag already
+          # exists, so the job-level parent-success check covers that case). The parent always rebuilds when this
           # does (changed_files is one string, so contains() on .../Dockerfile
           # matches Dockerfile.*).
           # Both names, since some variants are FROM <tag>-latest.
@@ -354,18 +376,21 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-latest=docker-image://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-${{ github.sha }}
           platforms: linux/${{ matrix.arch }}
           outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          # Scheduled runs rebuild from scratch: a cached layer would keep
+          # last week's Alpine packages whenever the base image is unchanged.
+          no-cache: ${{ github.event_name == 'schedule' }}
           cache-from: type=gha,scope=${{ matrix.version }}-frankenphp-${{ matrix.variant }}-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.version }}-frankenphp-${{ matrix.variant }}-${{ matrix.arch }}
 
       - name: Export digest
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         run: |
           mkdir -p /tmp/digests
           digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
 
       - name: Upload digest
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/upload-artifact@v4
         with:
           name: digest-fpdep-${{ matrix.version }}-${{ matrix.variant }}-${{ matrix.arch }}
@@ -375,7 +400,7 @@ jobs:
 
   merge-frankenphp-dependent:
     needs: [detect-changes, build-frankenphp-dependent]
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && needs.build-frankenphp-dependent.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -397,25 +422,25 @@ jobs:
       # wordpress that glob also matched wordpress-dev's digests, so the
       # -wordpress tags also carried the dev images.
       - name: Download digest (amd64)
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
           name: digest-fpdep-${{ matrix.version }}-${{ matrix.variant }}-amd64
 
       - name: Download digest (arm64)
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
           name: digest-fpdep-${{ matrix.version }}-${{ matrix.variant }}-arm64
 
       - name: Set up Docker Buildx
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
@@ -423,7 +448,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create manifest list and push
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         working-directory: /tmp/digests
         run: |
           # Exactly one amd64 and one arm64 digest.
@@ -439,7 +464,11 @@ jobs:
   # as wordpress it raced, and built on the previously published image.
   build-frankenphp-wordpress-dev:
     needs: [detect-changes, merge-frankenphp-dependent]
-    if: ${{ !cancelled() }}
+    # Only on a parent that this run published: a scheduled run's -<sha> tags
+    # already exist from an earlier run, so a failed parent would otherwise
+    # leave wordpress-dev building on last week's image. Over-conservative on
+    # purpose: one version's failure holds back the others' children too.
+    if: ${{ !cancelled() && needs.merge-frankenphp-dependent.result == 'success' }}
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     permissions:
       contents: read
@@ -458,15 +487,15 @@ jobs:
           - { version: "8.5", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: arm64, force_input: build_php_85 }
     steps:
       - name: Checkout code
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
@@ -475,7 +504,7 @@ jobs:
 
       - name: Build and push by digest (${{ matrix.version }}-${{ matrix.variant }}, ${{ matrix.arch }})
         id: build
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/build-push-action@v7
         with:
           context: php/${{ matrix.version }}/frankenphp
@@ -483,25 +512,29 @@ jobs:
           # Build FROM the parent published for this commit (its -<sha> tag),
           # not whatever the floating tag pointed at when this leg started: if
           # no run at this commit published the parent, this fails instead of
-          # building on a stale image. The parent always rebuilds when this
+          # building on a stale image (on a scheduled run the tag already
+          # exists, so the job-level parent-success check covers that case). The parent always rebuilds when this
           # does (changed_files is one string, so contains() on .../Dockerfile
           # matches Dockerfile.*).
           build-contexts: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-wordpress=docker-image://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-wordpress-${{ github.sha }}
           platforms: linux/${{ matrix.arch }}
           outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          # Scheduled runs rebuild from scratch: a cached layer would keep
+          # last week's Alpine packages whenever the base image is unchanged.
+          no-cache: ${{ github.event_name == 'schedule' }}
           cache-from: type=gha,scope=${{ matrix.version }}-frankenphp-${{ matrix.variant }}-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.version }}-frankenphp-${{ matrix.variant }}-${{ matrix.arch }}
 
       - name: Export digest
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         run: |
           mkdir -p /tmp/digests
           digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
 
       - name: Upload digest
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/upload-artifact@v4
         with:
           name: digest-fpdep-${{ matrix.version }}-${{ matrix.variant }}-${{ matrix.arch }}
@@ -511,7 +544,7 @@ jobs:
 
   merge-frankenphp-wordpress-dev:
     needs: [detect-changes, build-frankenphp-wordpress-dev]
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && needs.build-frankenphp-wordpress-dev.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -528,25 +561,25 @@ jobs:
       # Exact artifact names: a missing arch fails here rather than
       # publishing a single-arch tag.
       - name: Download digest (amd64)
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
           name: digest-fpdep-${{ matrix.version }}-${{ matrix.variant }}-amd64
 
       - name: Download digest (arm64)
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
           name: digest-fpdep-${{ matrix.version }}-${{ matrix.variant }}-arm64
 
       - name: Set up Docker Buildx
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
@@ -554,7 +587,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create manifest list and push
-        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         working-directory: /tmp/digests
         run: |
           # Exactly one amd64 and one arm64 digest.
