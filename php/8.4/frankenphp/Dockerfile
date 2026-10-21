@@ -3,8 +3,9 @@ ARG PHP_VERSION=8.4
 # PHP security release to rebuild over the upstream image's PHP, for when
 # upstream (php:*-zts-alpine -> dunglas/frankenphp) lags a php.net release.
 # Hash from https://www.php.net/releases/index.php?json&version=8.4.
-# Remove the php-patched stage and its COPY once the FROM image ships this
-# version or newer.
+# Once the FROM image ships this version or newer (the php-patched stage
+# then fails the build), remove the php-patched stage, these PHP_PATCH_*
+# ARGs, and the ARG/COPY/ENV block after LABEL in the final stage.
 ARG PHP_PATCH_VERSION=8.4.27
 ARG PHP_PATCH_SHA256=dcf93923b0e38e0d5252b25b796520b5a47761a08b3488b6d0b5d1115764d3f0
 
@@ -17,7 +18,17 @@ FROM dunglas/frankenphp:${FRANKENPHP_VERSION}-php${PHP_VERSION}-alpine AS php-pa
 ARG PHP_PATCH_VERSION
 ARG PHP_PATCH_SHA256
 RUN set -eux; \
-    configure_opts="$(php-config --configure-options | sed 's/ PHP_UNAME=.*//')"; \
+    # Copying this build over a base that already has the same or a newer
+    # PHP would silently downgrade it.
+    php -r 'exit(version_compare(PHP_VERSION, getenv("PHP_PATCH_VERSION"), "<") ? 0 : 1);' || \
+        { echo "ERROR: base already ships PHP $(php -r 'echo PHP_VERSION;'); remove the php-patched stage" >&2; exit 1; }; \
+    \
+    # 8.4+ record PHP_UNAME='Linux - Docker' unquoted; drop it so the word
+    # split at ./configure doesn't break it apart (it's re-added there).
+    configure_opts="$(php-config --configure-options | sed 's/ PHP_UNAME=Linux - Docker//')"; \
+    case "$configure_opts" in *PHP_UNAME=*) \
+        echo "ERROR: unexpected PHP_UNAME in configure options: $configure_opts" >&2; exit 1;; \
+    esac; \
     apk add --no-cache --virtual .build-deps \
         $PHPIZE_DEPS \
         argon2-dev \
@@ -64,7 +75,8 @@ LABEL maintainer="Michael Aguiar <mike@aliasproject.com>"
 
 ARG PHP_PATCH_VERSION
 ARG PHP_PATCH_SHA256
-COPY --from=php-patched /php-install/ /
+# Only usr/: PEAR's installer also drops registry dotfiles at INSTALL_ROOT.
+COPY --from=php-patched /php-install/usr/ /usr/
 ENV PHP_VERSION=${PHP_PATCH_VERSION} \
     PHP_URL=https://www.php.net/distributions/php-${PHP_PATCH_VERSION}.tar.xz \
     PHP_ASC_URL=https://www.php.net/distributions/php-${PHP_PATCH_VERSION}.tar.xz.asc \
@@ -106,9 +118,12 @@ ENV PHP_MEMORY_LIMIT=256M \
     MSMTP_RELAY_SERVER_FROM=no-reply@localhost
 
     # Fail the build rather than ship the vulnerable PHP if the patched
-    # libphp/binaries didn't land over the upstream ones.
-RUN test "$(php -r 'echo PHP_VERSION;')" = "$PHP_VERSION" || \
-        (echo "ERROR: php reports $(php -r 'echo PHP_VERSION;'), expected $PHP_VERSION" >&2 && exit 1) && \
+    # libphp/binaries didn't land over the upstream ones. `frankenphp
+    # php-cli` runs the libphp.so the server embeds; `php` is its own binary.
+RUN for bin in "frankenphp php-cli" php; do \
+        v="$($bin -r 'echo PHP_VERSION;')"; \
+        test "$v" = "$PHP_VERSION" || { echo "ERROR: $bin reports $v, expected $PHP_VERSION" >&2; exit 1; }; \
+    done && \
     \
     sed -i 's/{$SERVER_NAME:localhost}/:{$PORT:80}/' /etc/caddy/Caddyfile && \
     sed -i '/CADDY_GLOBAL_OPTIONS/a http_port {$PORT:80}' /etc/caddy/Caddyfile && \
