@@ -485,10 +485,8 @@ jobs:
           # building on a stale image. The parent always rebuilds when this
           # does (changed_files is one string, so contains() on .../Dockerfile
           # matches Dockerfile.*).
-          # Both names, since some variants are FROM <tag>-latest.
           build-contexts: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-wordpress=docker-image://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-wordpress-${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-wordpress-latest=docker-image://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-wordpress-${{ github.sha }}
           platforms: linux/${{ matrix.arch }}
           outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ matrix.version }}-frankenphp-${{ matrix.variant }}-${{ matrix.arch }}
@@ -526,9 +524,8 @@ jobs:
           - { version: "8.4", variant: wordpress-dev, force_input: build_php_84 }
           - { version: "8.5", variant: wordpress-dev, force_input: build_php_85 }
     steps:
-      # Exact artifact names, not digest-fpdep-<ver>-<variant>-*: for
-      # wordpress that glob also matched wordpress-dev's digests, so the
-      # -wordpress tags also carried the dev images.
+      # Exact artifact names: a missing arch fails here rather than
+      # publishing a single-arch tag.
       - name: Download digest (amd64)
         if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/download-artifact@v4
