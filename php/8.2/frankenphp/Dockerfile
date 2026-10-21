@@ -1,8 +1,83 @@
-ARG FRANKENPHP_VERSION=1.9
+ARG FRANKENPHP_VERSION=1.13.1
 ARG PHP_VERSION=8.2
+# PHP security release to rebuild over the upstream image's PHP, for when
+# upstream (php:*-zts-alpine -> dunglas/frankenphp) lags a php.net release.
+# Hash from https://www.php.net/releases/index.php?json&version=8.2.
+# Remove the php-patched stage and its COPY once the FROM image ships this
+# version or newer.
+ARG PHP_PATCH_VERSION=8.2.35
+ARG PHP_PATCH_SHA256=5737b98601fe5ab1b8c5db0c82ed3158acb9283ed3081ffe2faffb9ac81455e6
+
+# Rebuilds PHP from the patched tarball using the upstream image's own
+# configure flags (read back from php-config) and the docker-library build
+# recipe, then stages `make install` into /php-install. FrankenPHP links
+# libphp.so dynamically and a patch release keeps the same API numbers, so
+# swapping libphp.so, the binaries and the shared extensions is enough.
+FROM dunglas/frankenphp:${FRANKENPHP_VERSION}-php${PHP_VERSION}-alpine AS php-patched
+ARG PHP_PATCH_VERSION
+ARG PHP_PATCH_SHA256
+RUN set -eux; \
+    configure_opts="$(php-config --configure-options | sed 's/ PHP_UNAME=.*//')"; \
+    apk add --no-cache --virtual .build-deps \
+        $PHPIZE_DEPS \
+        argon2-dev \
+        coreutils \
+        curl-dev \
+        gnu-libiconv-dev \
+        libsodium-dev \
+        libxml2-dev \
+        linux-headers \
+        oniguruma-dev \
+        openssl-dev \
+        patch \
+        patchutils \
+        readline-dev \
+        sqlite-dev; \
+    # make sure musl's iconv doesn't get used (matches docker-library)
+    rm -vf /usr/include/iconv.h; \
+    \
+    mkdir -p /php-install/usr/src "/php-install$PHP_INI_DIR"; \
+    curl -fsSL -o /php-install/usr/src/php.tar.xz "https://www.php.net/distributions/php-${PHP_PATCH_VERSION}.tar.xz"; \
+    curl -fsSL -o /php-install/usr/src/php.tar.xz.asc "https://www.php.net/distributions/php-${PHP_PATCH_VERSION}.tar.xz.asc"; \
+    echo "${PHP_PATCH_SHA256} */php-install/usr/src/php.tar.xz" | sha256sum -c -; \
+    mkdir /usr/src/php; \
+    tar -Jxf /php-install/usr/src/php.tar.xz -C /usr/src/php --strip-components=1; \
+    cd /usr/src/php; \
+    # 8.2's JIT fails to assemble on Alpine 3.22+ binutils without this
+    # (same patch docker-library applies to its 8.2 alpine images):
+    # https://github.com/php/php-src/issues/18743
+    curl -fL 'https://github.com/php/php-src/commit/b3c8afe272a6919248986c703c2e1defc73ff707.patch?full_index=1' -o 18743.patch; \
+    echo 'b334f73434c9732a4b27a42eb5d417e10df842e854c02a3e753b2479f8978bf5 *18743.patch' | sha256sum -c -; \
+    filterdiff -x '*/NEWS' 18743.patch | patch -p1; \
+    rm 18743.patch; \
+    \
+    export \
+        CFLAGS="$PHP_CFLAGS" \
+        CPPFLAGS="$PHP_CPPFLAGS" \
+        LDFLAGS="$PHP_LDFLAGS" \
+        PHP_BUILD_PROVIDER='https://github.com/docker-library/php'; \
+    # word splitting of configure_opts is intended
+    ./configure $configure_opts PHP_UNAME='Linux - Docker'; \
+    make -j "$(nproc)"; \
+    find -type f -name '*.a' -delete; \
+    make install INSTALL_ROOT=/php-install; \
+    find /php-install/usr/local -type f -perm '/0111' \
+        -exec sh -euxc 'strip --strip-all "$@" || :' -- '{}' +; \
+    cp -v php.ini-* "/php-install$PHP_INI_DIR/"; \
+    \
+    test "$(/php-install/usr/local/bin/php -n -r 'echo PHP_VERSION;')" = "$PHP_PATCH_VERSION"
+
 FROM dunglas/frankenphp:${FRANKENPHP_VERSION}-php${PHP_VERSION}-alpine
 
 LABEL maintainer="Michael Aguiar <mike@aliasproject.com>"
+
+ARG PHP_PATCH_VERSION
+ARG PHP_PATCH_SHA256
+COPY --from=php-patched /php-install/ /
+ENV PHP_VERSION=${PHP_PATCH_VERSION} \
+    PHP_URL=https://www.php.net/distributions/php-${PHP_PATCH_VERSION}.tar.xz \
+    PHP_ASC_URL=https://www.php.net/distributions/php-${PHP_PATCH_VERSION}.tar.xz.asc \
+    PHP_SHA256=${PHP_PATCH_SHA256}
 
 # Runtime UID. Keep this DIFFERENT from the UID that owns the bind-mounted
 # source on the host: if they match, PHP owns every file it serves and any
@@ -39,7 +114,12 @@ ENV PHP_MEMORY_LIMIT=256M \
     MSMTP_RELAY_SERVER_TLS=off \
     MSMTP_RELAY_SERVER_FROM=no-reply@localhost
 
-RUN sed -i 's/{$SERVER_NAME:localhost}/:{$PORT:80}/' /etc/caddy/Caddyfile && \
+    # Fail the build rather than ship the vulnerable PHP if the patched
+    # libphp/binaries didn't land over the upstream ones.
+RUN test "$(php -r 'echo PHP_VERSION;')" = "$PHP_VERSION" || \
+        (echo "ERROR: php reports $(php -r 'echo PHP_VERSION;'), expected $PHP_VERSION" >&2 && exit 1) && \
+    \
+    sed -i 's/{$SERVER_NAME:localhost}/:{$PORT:80}/' /etc/caddy/Caddyfile && \
     sed -i '/CADDY_GLOBAL_OPTIONS/a http_port {$PORT:80}' /etc/caddy/Caddyfile && \
     sed -i '/http_port/a servers :{$PORT:80} {\nprotocols h1 h2 h2c h3\n}' /etc/caddy/Caddyfile && \
     \
