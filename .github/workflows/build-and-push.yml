@@ -243,13 +243,21 @@ jobs:
           - { version: "8.4", force_input: build_php_84 }
           - { version: "8.5", force_input: build_php_85 }
     steps:
-      - name: Download digests
+      # Exact artifact names: a missing arch fails here rather than
+      # publishing a single-arch tag.
+      - name: Download digest (amd64)
         if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
-          pattern: digest-fpbase-${{ matrix.version }}-*
-          merge-multiple: true
+          name: digest-fpbase-${{ matrix.version }}-amd64
+
+      - name: Download digest (arm64)
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          name: digest-fpbase-${{ matrix.version }}-arm64
 
       - name: Set up Docker Buildx
         if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
@@ -267,6 +275,8 @@ jobs:
         if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         working-directory: /tmp/digests
         run: |
+          # Exactly one amd64 and one arm64 digest.
+          test "$(ls | wc -l)" -eq 2
           docker buildx imagetools create \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-latest \
@@ -295,26 +305,18 @@ jobs:
           - { version: "8.2", variant: dev,           file: Dockerfile.dev,           arch: arm64, force_input: build_php_82 }
           - { version: "8.2", variant: wordpress,     file: Dockerfile.wordpress,     arch: amd64, force_input: build_php_82 }
           - { version: "8.2", variant: wordpress,     file: Dockerfile.wordpress,     arch: arm64, force_input: build_php_82 }
-          - { version: "8.2", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: amd64, force_input: build_php_82 }
-          - { version: "8.2", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: arm64, force_input: build_php_82 }
           - { version: "8.3", variant: dev,           file: Dockerfile.dev,           arch: amd64, force_input: build_php_83 }
           - { version: "8.3", variant: dev,           file: Dockerfile.dev,           arch: arm64, force_input: build_php_83 }
           - { version: "8.3", variant: wordpress,     file: Dockerfile.wordpress,     arch: amd64, force_input: build_php_83 }
           - { version: "8.3", variant: wordpress,     file: Dockerfile.wordpress,     arch: arm64, force_input: build_php_83 }
-          - { version: "8.3", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: amd64, force_input: build_php_83 }
-          - { version: "8.3", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: arm64, force_input: build_php_83 }
           - { version: "8.4", variant: dev,           file: Dockerfile.dev,           arch: amd64, force_input: build_php_84 }
           - { version: "8.4", variant: dev,           file: Dockerfile.dev,           arch: arm64, force_input: build_php_84 }
           - { version: "8.4", variant: wordpress,     file: Dockerfile.wordpress,     arch: amd64, force_input: build_php_84 }
           - { version: "8.4", variant: wordpress,     file: Dockerfile.wordpress,     arch: arm64, force_input: build_php_84 }
-          - { version: "8.4", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: amd64, force_input: build_php_84 }
-          - { version: "8.4", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: arm64, force_input: build_php_84 }
           - { version: "8.5", variant: dev,           file: Dockerfile.dev,           arch: amd64, force_input: build_php_85 }
           - { version: "8.5", variant: dev,           file: Dockerfile.dev,           arch: arm64, force_input: build_php_85 }
           - { version: "8.5", variant: wordpress,     file: Dockerfile.wordpress,     arch: amd64, force_input: build_php_85 }
           - { version: "8.5", variant: wordpress,     file: Dockerfile.wordpress,     arch: arm64, force_input: build_php_85 }
-          - { version: "8.5", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: amd64, force_input: build_php_85 }
-          - { version: "8.5", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: arm64, force_input: build_php_85 }
     steps:
       - name: Checkout code
         if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
@@ -339,6 +341,16 @@ jobs:
         with:
           context: php/${{ matrix.version }}/frankenphp
           file: php/${{ matrix.version }}/frankenphp/${{ matrix.file }}
+          # Build FROM the parent published for this commit (its -<sha> tag),
+          # not whatever the floating tag pointed at when this leg started: if
+          # no run at this commit published the parent, this fails instead of
+          # building on a stale image. The parent always rebuilds when this
+          # does (changed_files is one string, so contains() on .../Dockerfile
+          # matches Dockerfile.*).
+          # Both names, since some variants are FROM <tag>-latest.
+          build-contexts: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp=docker-image://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-latest=docker-image://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-${{ github.sha }}
           platforms: linux/${{ matrix.arch }}
           outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ matrix.version }}-frankenphp-${{ matrix.variant }}-${{ matrix.arch }}
@@ -373,24 +385,29 @@ jobs:
         include:
           - { version: "8.2", variant: dev,           force_input: build_php_82 }
           - { version: "8.2", variant: wordpress,     force_input: build_php_82 }
-          - { version: "8.2", variant: wordpress-dev, force_input: build_php_82 }
           - { version: "8.3", variant: dev,           force_input: build_php_83 }
           - { version: "8.3", variant: wordpress,     force_input: build_php_83 }
-          - { version: "8.3", variant: wordpress-dev, force_input: build_php_83 }
           - { version: "8.4", variant: dev,           force_input: build_php_84 }
           - { version: "8.4", variant: wordpress,     force_input: build_php_84 }
-          - { version: "8.4", variant: wordpress-dev, force_input: build_php_84 }
           - { version: "8.5", variant: dev,           force_input: build_php_85 }
           - { version: "8.5", variant: wordpress,     force_input: build_php_85 }
-          - { version: "8.5", variant: wordpress-dev, force_input: build_php_85 }
     steps:
-      - name: Download digests
+      # Exact artifact names, not digest-fpdep-<ver>-<variant>-*: for
+      # wordpress that glob also matched wordpress-dev's digests, so the
+      # -wordpress tags also carried the dev images.
+      - name: Download digest (amd64)
         if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
-          pattern: digest-fpdep-${{ matrix.version }}-${{ matrix.variant }}-*
-          merge-multiple: true
+          name: digest-fpdep-${{ matrix.version }}-${{ matrix.variant }}-amd64
+
+      - name: Download digest (arm64)
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          name: digest-fpdep-${{ matrix.version }}-${{ matrix.variant }}-arm64
 
       - name: Set up Docker Buildx
         if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
@@ -408,6 +425,139 @@ jobs:
         if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         working-directory: /tmp/digests
         run: |
+          # Exactly one amd64 and one arm64 digest.
+          test "$(ls | wc -l)" -eq 2
+          docker buildx imagetools create \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-${{ matrix.variant }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-${{ matrix.variant }}-latest \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-${{ matrix.variant }}-${{ github.sha }} \
+            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+
+  # wordpress-dev is FROM -wordpress, so it builds only after
+  # merge-frankenphp-dependent has published that tag. In the same matrix
+  # as wordpress it raced, and built on the previously published image.
+  build-frankenphp-wordpress-dev:
+    needs: [detect-changes, merge-frankenphp-dependent]
+    if: ${{ !cancelled() }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { version: "8.2", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: amd64, force_input: build_php_82 }
+          - { version: "8.2", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: arm64, force_input: build_php_82 }
+          - { version: "8.3", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: amd64, force_input: build_php_83 }
+          - { version: "8.3", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: arm64, force_input: build_php_83 }
+          - { version: "8.4", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: amd64, force_input: build_php_84 }
+          - { version: "8.4", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: arm64, force_input: build_php_84 }
+          - { version: "8.5", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: amd64, force_input: build_php_85 }
+          - { version: "8.5", variant: wordpress-dev, file: Dockerfile.wordpress-dev, arch: arm64, force_input: build_php_85 }
+    steps:
+      - name: Checkout code
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push by digest (${{ matrix.version }}-${{ matrix.variant }}, ${{ matrix.arch }})
+        id: build
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        uses: docker/build-push-action@v7
+        with:
+          context: php/${{ matrix.version }}/frankenphp
+          file: php/${{ matrix.version }}/frankenphp/${{ matrix.file }}
+          # Build FROM the parent published for this commit (its -<sha> tag),
+          # not whatever the floating tag pointed at when this leg started: if
+          # no run at this commit published the parent, this fails instead of
+          # building on a stale image. The parent always rebuilds when this
+          # does (changed_files is one string, so contains() on .../Dockerfile
+          # matches Dockerfile.*).
+          build-contexts: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-wordpress=docker-image://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-wordpress-${{ github.sha }}
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.version }}-frankenphp-${{ matrix.variant }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.version }}-frankenphp-${{ matrix.variant }}-${{ matrix.arch }}
+
+      - name: Export digest
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-fpdep-${{ matrix.version }}-${{ matrix.variant }}-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge-frankenphp-wordpress-dev:
+    needs: [detect-changes, build-frankenphp-wordpress-dev]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { version: "8.2", variant: wordpress-dev, force_input: build_php_82 }
+          - { version: "8.3", variant: wordpress-dev, force_input: build_php_83 }
+          - { version: "8.4", variant: wordpress-dev, force_input: build_php_84 }
+          - { version: "8.5", variant: wordpress-dev, force_input: build_php_85 }
+    steps:
+      # Exact artifact names: a missing arch fails here rather than
+      # publishing a single-arch tag.
+      - name: Download digest (amd64)
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          name: digest-fpdep-${{ matrix.version }}-${{ matrix.variant }}-amd64
+
+      - name: Download digest (arm64)
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          name: digest-fpdep-${{ matrix.version }}-${{ matrix.variant }}-arm64
+
+      - name: Set up Docker Buildx
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create manifest list and push
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        working-directory: /tmp/digests
+        run: |
+          # Exactly one amd64 and one arm64 digest.
+          test "$(ls | wc -l)" -eq 2
           docker buildx imagetools create \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-${{ matrix.variant }} \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-${{ matrix.variant }}-latest \
@@ -416,7 +566,7 @@ jobs:
 
   summary:
     runs-on: ubuntu-latest
-    needs: [build-base, merge-frankenphp-base, merge-frankenphp-dependent]
+    needs: [build-base, merge-frankenphp-base, merge-frankenphp-dependent, merge-frankenphp-wordpress-dev]
     if: always()
     steps:
       - name: Build Summary
@@ -434,4 +584,4 @@ jobs:
           echo "- **PHP 8.4:** \`8.4-cli-latest\`, \`8.4-frankenphp-latest\`, \`8.4-frankenphp-dev-latest\`, \`8.4-frankenphp-wordpress-latest\`" >> $GITHUB_STEP_SUMMARY
           echo "- **PHP 8.5:** \`8.5-cli-latest\`, \`8.5-frankenphp-latest\`, \`8.5-frankenphp-dev-latest\`, \`8.5-frankenphp-wordpress-latest\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Status:** ${{ (needs.build-base.result == 'success' && needs.merge-frankenphp-base.result == 'success' && needs.merge-frankenphp-dependent.result == 'success') && '✅ All builds successful!' || '❌ Some builds failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ (needs.build-base.result == 'success' && needs.merge-frankenphp-base.result == 'success' && needs.merge-frankenphp-dependent.result == 'success' && needs.merge-frankenphp-wordpress-dev.result == 'success') && '✅ All builds successful!' || '❌ Some builds failed' }}" >> $GITHUB_STEP_SUMMARY
