@@ -243,13 +243,21 @@ jobs:
           - { version: "8.4", force_input: build_php_84 }
           - { version: "8.5", force_input: build_php_85 }
     steps:
-      - name: Download digests
+      # Exact artifact names: a missing arch fails here rather than
+      # publishing a single-arch tag.
+      - name: Download digest (amd64)
         if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
-          pattern: digest-fpbase-${{ matrix.version }}-*
-          merge-multiple: true
+          name: digest-fpbase-${{ matrix.version }}-amd64
+
+      - name: Download digest (arm64)
+        if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          name: digest-fpbase-${{ matrix.version }}-arm64
 
       - name: Set up Docker Buildx
         if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
@@ -267,6 +275,8 @@ jobs:
         if: ${{ inputs.force_build_all || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         working-directory: /tmp/digests
         run: |
+          # Exactly one amd64 and one arm64 digest.
+          test "$(ls | wc -l)" -eq 2
           docker buildx imagetools create \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-latest \
@@ -331,11 +341,12 @@ jobs:
         with:
           context: php/${{ matrix.version }}/frankenphp
           file: php/${{ matrix.version }}/frankenphp/${{ matrix.file }}
-          # Build FROM exactly the parent this run pushed (its -<sha> tag), not
-          # whatever the floating tag pointed at when this leg started: if the
-          # parent failed to publish, this fails instead of building on a stale
-          # image. The parent always rebuilds when this does (changed_files is
-          # one string, so contains() on .../Dockerfile matches Dockerfile.*).
+          # Build FROM the parent published for this commit (its -<sha> tag),
+          # not whatever the floating tag pointed at when this leg started: if
+          # no run at this commit published the parent, this fails instead of
+          # building on a stale image. The parent always rebuilds when this
+          # does (changed_files is one string, so contains() on .../Dockerfile
+          # matches Dockerfile.*).
           # Both names, since some variants are FROM <tag>-latest.
           build-contexts: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp=docker-image://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-${{ github.sha }}
@@ -468,11 +479,12 @@ jobs:
         with:
           context: php/${{ matrix.version }}/frankenphp
           file: php/${{ matrix.version }}/frankenphp/${{ matrix.file }}
-          # Build FROM exactly the parent this run pushed (its -<sha> tag), not
-          # whatever the floating tag pointed at when this leg started: if the
-          # parent failed to publish, this fails instead of building on a stale
-          # image. The parent always rebuilds when this does (changed_files is
-          # one string, so contains() on .../Dockerfile matches Dockerfile.*).
+          # Build FROM the parent published for this commit (its -<sha> tag),
+          # not whatever the floating tag pointed at when this leg started: if
+          # no run at this commit published the parent, this fails instead of
+          # building on a stale image. The parent always rebuilds when this
+          # does (changed_files is one string, so contains() on .../Dockerfile
+          # matches Dockerfile.*).
           # Both names, since some variants are FROM <tag>-latest.
           build-contexts: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-wordpress=docker-image://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}-frankenphp-wordpress-${{ github.sha }}
