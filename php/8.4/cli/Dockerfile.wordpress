@@ -25,13 +25,13 @@ RUN if [ "${APP_UID}" != "$(id -u appuser)" ]; then \
 # igbinary in particular is a correctness requirement, not parity for its own
 # sake -- the redis-cache plugin can serialize with it, and a CLI without
 # igbinary silently fails to deserialize the object cache.
-RUN apk add --no-cache \
-    php84-exif \
-    php84-gd \
-    php84-mysqli \
-    php84-pecl-igbinary \
-    php84-pecl-imagick \
-    php84-pecl-redis \
-    php84-soap
+RUN install-php-extensions \
+    mysqli \
+    gd \
+    exif \
+    redis \
+    igbinary \
+    imagick \
+    soap
 
 USER appuser

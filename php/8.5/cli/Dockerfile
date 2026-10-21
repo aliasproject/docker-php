@@ -1,36 +1,42 @@
-FROM alpine:edge
+# Official image: it tracks php.net patch releases, where Alpine's stable
+# branches can sit on one PHP patch release for months, and it is the same
+# PHP build the frankenphp images use (php:*-zts-alpine under
+# dunglas/frankenphp), so CLI and web containers run the same PHP.
+FROM php:8.5-cli-alpine
 
 LABEL maintainer="Michael Aguiar <mike@aliasproject.com>"
 
-RUN apk add --no-cache \
-    curl \
-    php85 \
-    php85-bcmath \
-    php85-common \
-    php85-ctype \
-    php85-curl \
-    php85-dom \
-    php85-exif \
-    php85-fileinfo \
-    php85-gd \
-    php85-iconv \
-    php85-mbstring \
-    php85-mysqli \
-    php85-openssl \
-    php85-pcntl \
-    php85-pdo_mysql \
-    php85-pecl-imagick \
-    php85-pecl-redis \
-    php85-phar \
-    php85-posix \
-    php85-session \
-    php85-simplexml \
-    php85-sodium \
-    php85-tokenizer \
-    php85-xml \
-    php85-xmlreader \
-    php85-xmlwriter \
-    php85-zip
+# Same installer the frankenphp images ship.
+COPY --from=mlocati/php-extension-installer:2 /usr/bin/install-php-extensions /usr/local/bin/
+
+# Same extensions as the Alpine-package image this replaced. igbinary and
+# msgpack are installed alongside redis so it's built with both serializers.
+RUN apk add --no-cache tzdata && \
+    install-php-extensions \
+        bcmath \
+        exif \
+        gd \
+        igbinary \
+        imagick \
+        msgpack \
+        mysqli \
+        pcntl \
+        pdo_mysql \
+        redis \
+        sockets \
+        zip && \
+    \
+    cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" && \
+    printf 'max_execution_time = 0\ndate.timezone = UTC\n' \
+        > "$PHP_INI_DIR/conf.d/99-cli.ini" && \
+    \
+    # The Alpine-package image this replaced had PHP at /usr/bin/php and
+    # /usr/bin/php85; keep both working for scripts that call them.
+    ln -s /usr/local/bin/php /usr/bin/php && \
+    ln -s /usr/local/bin/php /usr/bin/php85 && \
+    \
+    # The CGI and debugger SAPIs are ~20MB each and unused in a CLI image.
+    rm /usr/local/bin/php-cgi /usr/local/bin/phpdbg
 
 WORKDIR /app
 
