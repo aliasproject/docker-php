@@ -45,6 +45,19 @@ docker run -e CADDY_IMMUTABLE_ASSET_PATHS="/build/" \
 
 The `wordpress` variant sets both lists out of the box (see below).
 
+## Laravel hardening
+
+The base image ships no no-exec policy, so a `.php` file that lands in a directory the app can write to is executed when requested. For Laravel that directory is `storage`: the Livewire upload vulnerability ([GHSA-29cq-5w36-x7w3](https://github.com/livewire/livewire/security/advisories/GHSA-29cq-5w36-x7w3)) was exploited in the wild by dropping a script there and then requesting `/storage/....php`. Set `PHP_NO_EXEC_PATHS` so nothing under `/storage/` can ever reach the PHP handler:
+
+```sh
+docker run -e PHP_NO_EXEC_PATHS="/storage/*" \
+           -e CADDY_IMMUTABLE_ASSET_PATHS="/build/" \
+           -e CADDY_MEDIA_PATHS="/storage/" \
+           ghcr.io/aliasproject/php:8.4-frankenphp
+```
+
+Requests for PHP source under that path (any case, e.g. `shell.PHP`, or with trailing path info, e.g. `shell.php/foo`) return 404 or 400 and never execute; images and other files in the directory are still served, so `public/storage` uploads keep working. Add more writable paths space-separated (`PHP_NO_EXEC_PATHS="/storage/* /uploads/*"`). `PHP_NO_EXEC_PATHS` replaces the default rather than appending, so a derived image or `docker run` that sets it must list every path it wants protected.
+
 ## WordPress hardening
 
 The `frankenphp:wordpress` variant renders a Caddy hardening snippet at container boot:
