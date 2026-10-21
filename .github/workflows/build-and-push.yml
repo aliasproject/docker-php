@@ -624,9 +624,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Boot the amd64 image (the runner's own architecture) before it gets
-      # any tag. A failure here leaves the existing floating tags untouched,
-      # and holds back the images built FROM this one (their jobs need this
-      # one to succeed).
+      # any tag. A failure here leaves the existing floating tags untouched.
       - name: Checkout smoke test script
         if: ${{ steps.digest_amd64.outcome == 'success' }}
         uses: actions/checkout@v7

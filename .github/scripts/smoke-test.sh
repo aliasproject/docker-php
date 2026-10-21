@@ -49,10 +49,10 @@ check_php() {
 }
 
 if [ "$variant" = cli ]; then
-    version=$(docker run --rm "$image" php -r 'echo PHP_VERSION;')
-    loaded=$(docker run --rm "$image" php -m | tr '\n' ' ')
+    version=$(docker run --rm "$image" php -r 'echo PHP_VERSION;') || fail "php did not run"
+    loaded=$(docker run --rm "$image" php -m | tr '\n' ' ') || fail "php -m did not run"
     check_php "$version" "$loaded"
-    uid=$(docker run --rm "$image" id -u)
+    uid=$(docker run --rm "$image" id -u) || fail "id did not run"
     [ "$uid" != 0 ] || fail "runs as root"
     echo "ok: $image (PHP $version, uid $uid)"
     exit 0
