@@ -6,10 +6,9 @@ on:
   # Weekly rebuild, so updates to the base images (new php.net patch
   # releases in the official php images; rebuilds of the pinned
   # dunglas/frankenphp version) and Alpine package fixes reach the tags
-  # without a Dockerfile change. Scheduled runs build everything (each
-  # build condition checks github.event_name) and skip the layer cache
-  # (no-cache on each build step). A new FrankenPHP release still needs
-  # FRANKENPHP_VERSION bumped by hand.
+  # without a Dockerfile change. Scheduled runs build everything and skip
+  # the layer cache (no-cache on each build step). A new FrankenPHP release
+  # still needs FRANKENPHP_VERSION bumped by hand.
   schedule:
     - cron: "0 10 * * 1" # Mondays 10:00 UTC
   workflow_dispatch:
