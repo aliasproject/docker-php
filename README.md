@@ -1,20 +1,17 @@
 # docker-php
 
-Docker images for PHP, published to `ghcr.io/aliasproject/php`. The primary offering is [FrankenPHP](https://frankenphp.dev/) (Caddy + PHP) for 8.2–8.5, plus CLI images for 7.4–8.1 and 8.3–8.5.
+Docker images for PHP, published to `ghcr.io/aliasproject/php`. The primary offering is [FrankenPHP](https://frankenphp.dev/) (Caddy + PHP) for 8.2–8.5, plus CLI images for 8.3–8.5. Images for PHP versions past end of life (8.1 and older) are no longer built. Their last `7.4/8.0/8.1-cli-latest` tags are left in the registry, but they're unpatched (including for CVE-2026-109618/109619); move to `8.3-cli` or newer.
 
 ## Image matrix
 
 | PHP  | CLI | FrankenPHP | FrankenPHP (dev) | FrankenPHP (WordPress) |
 |------|:---:|:----------:|:-----------------:|:------------------------:|
-| 7.4  | ✅  |            |                    |                          |
-| 8.0  | ✅  |            |                    |                          |
-| 8.1  | ✅  |            |                    |                          |
 | 8.2  |     | ✅         | ✅                 | ✅                       |
 | 8.3  | ✅  | ✅         | ✅                 | ✅                       |
 | 8.4  | ✅  | ✅         | ✅                 | ✅                       |
 | 8.5  | ✅  | ✅         | ✅                 | ✅                       |
 
-Tags follow `<version>-<variant>` (e.g. `8.4-frankenphp-wordpress`), each also published as `-latest` and as `-<sha>` for the commit it was built from. Every image except the EOL 7.4–8.1 CLI images is rebuilt weekly (Mondays 10:00 UTC) to pick up base-image and Alpine package updates, which also refreshes the `-<sha>` tag of the current commit; pin by digest (`@sha256:…`) for a byte-for-byte fixed image. The frankenphp images stay on their pinned FrankenPHP version, so a new FrankenPHP release (and the PHP version it ships) still needs `FRANKENPHP_VERSION` bumped in their Dockerfiles.
+Tags follow `<version>-<variant>` (e.g. `8.4-frankenphp-wordpress`), each also published as `-latest` and as `-<sha>` for the commit it was built from. Every image is rebuilt weekly (Mondays 10:00 UTC) to pick up base-image and Alpine package updates, which also refreshes the `-<sha>` tag of the current commit; pin by digest (`@sha256:…`) for a byte-for-byte fixed image. The frankenphp images stay on their pinned FrankenPHP version, so a new FrankenPHP release (and the PHP version it ships) still needs `FRANKENPHP_VERSION` bumped in their Dockerfiles.
 
 ```sh
 docker pull ghcr.io/aliasproject/php:8.4-frankenphp
@@ -22,7 +19,7 @@ docker pull ghcr.io/aliasproject/php:8.4-frankenphp
 
 ## Variants
 
-- **cli** — the PHP CLI with unlimited execution time. 8.3–8.5 are built on the official `php:<version>-cli-alpine` images, so a rebuild picks up the latest php.net patch release (7.4–8.1 still use Alpine's EOL packages). 8.3–8.5 are also rebuilt weekly (Mondays 10:00 UTC), so they pick up new PHP patch releases without a Dockerfile change. PHP's ini files are in `/usr/local/etc/php` (`conf.d/` for overrides). 8.3–8.5 are identical apart from the PHP version: a minimal extension set (`pdo_mysql`, `bcmath`, `intl`, `pcntl`, `zip`, etc.), a 512M memory limit, and an unprivileged `appuser` in group `0`. Backend and library extensions (`mysqli`, `gd`, `imagick`, `redis`, `igbinary`, …) belong in a derived image such as `php/8.4/cli/Dockerfile.wordpress`.
+- **cli** — the PHP CLI with unlimited execution time, built on the official `php:<version>-cli-alpine` images, so each rebuild (including the weekly one) picks up the latest php.net patch release. PHP's ini files are in `/usr/local/etc/php` (`conf.d/` for overrides). The versions are identical apart from PHP itself: a minimal extension set (`pdo_mysql`, `bcmath`, `intl`, `pcntl`, `zip`, etc.), a 512M memory limit, and an unprivileged `appuser` in group `0`. Backend and library extensions (`mysqli`, `gd`, `imagick`, `redis`, `igbinary`, …) belong in a derived image such as `php/8.4/cli/Dockerfile.wordpress`.
 - **frankenphp** — FrankenPHP serves PHP directly through Caddy; no separate web server. Minimal extension set, non-root by default, mail sent through `msmtp`, Composer baked in, `HEALTHCHECK` against Caddy's admin API.
 - **frankenphp (dev)** — the FrankenPHP base with extra extensions (`mysqli`, `gd`, `exif`, `imagick`, `redis`, `igbinary`, `soap`) for local development.
 - **frankenphp (wordpress)** — the FrankenPHP base with the same extensions as `dev`, plus a hardening policy suited to running WordPress (see below).
