@@ -113,19 +113,28 @@ ext_alternation() {
     # Laravel's storage directory holds user-controlled files, and the Livewire
     # upload RCE (GHSA-29cq-5w36-x7w3) was exploited in the wild by dropping a
     # .php file there and requesting it. Nothing legitimately executes PHP from
-    # a /storage/ URL, so refuse any URL under it that names a .php file: any
-    # case, any depth, with or without trailing path info (which is how
-    # php_server splits it). Deliberately NOT `handle /storage/*` + file_server
-    # like the no-exec paths below: that also 404s requests with no file behind
-    # them, which breaks Laravel 11+'s local-disk serve route (GET
-    # /storage/{path}, answered by PHP). Everything else under /storage/ still
-    # reaches php_server and the static file handler.
-    if [ "${PHP_DENY_STORAGE_PHP:-on}" = "on" ]; then
-        echo "@storage_php path_regexp (?i)^/storage/.*\\.php(/|\$)"
-        echo "handle @storage_php {"
-        echo "  respond 404"
-        echo "}"
-    fi
+    # a /storage/ URL, so refuse two kinds of URL under it:
+    #   - one that names a .php file: any case, any depth, with or without
+    #     trailing path info (which is how php_server splits it);
+    #   - a directory URL (trailing slash, or /storage/ itself): php_server
+    #     answers those by running the directory's index.php, without the URL
+    #     ever naming a .php file. A request for the directory without the
+    #     slash is redirected to the slash form, so it lands here too.
+    # Deliberately NOT `handle /storage/*` + file_server like the no-exec paths
+    # below: that also 404s requests with no file behind them, which breaks
+    # Laravel 11+'s local-disk serve route (GET /storage/{path}, answered by
+    # PHP). Everything else under /storage/ still reaches php_server and the
+    # static file handler. Only an explicit off/0/false/no turns this off, so a
+    # mistyped value cannot silently disable the protection.
+    case "${PHP_DENY_STORAGE_PHP:-on}" in
+        off | OFF | Off | 0 | false | FALSE | False | no | NO | No) ;;
+        *)
+            echo "@storage_php path_regexp (?i)^/storage/(.*\\.php(/|\$)|(.*/)?\$)"
+            echo "handle @storage_php {"
+            echo "  respond 404"
+            echo "}"
+            ;;
+    esac
 
     # Paths the application can WRITE to must never EXECUTE. `handle` is
     # terminal and contains only file_server, so requests matching these
