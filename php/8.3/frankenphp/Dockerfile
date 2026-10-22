@@ -32,6 +32,7 @@ ENV PHP_MEMORY_LIMIT=256M \
     PHP_NO_EXEC_HIDE_EXTENSIONS="php phtml phar phps php3 php4 php5 php6 php7 php8 inc" \
     PHP_DENY_PATHS= \
     PHP_DENY_EXTENSIONS= \
+    PHP_DENY_STORAGE_PHP=on \
     CADDY_ACCESS_LOG=on \
     CADDY_ACCESS_LOG_PATH=/data/caddy/access.log \
     MSMTP_RELAY_SERVER_HOST=mailhog \
