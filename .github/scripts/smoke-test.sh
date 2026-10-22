@@ -68,7 +68,12 @@ trap cleanup EXIT
 
 # A page that reports what the server's own PHP looks like. The container user
 # is not the runner's, so the fixture must be world-readable.
-mkdir -p "$fixture/public"
+mkdir -p "$fixture/public/storage/idx"
+# A script an attacker could drop under /storage/ (Livewire GHSA-29cq-5w36-x7w3),
+# and an ordinary upload next to it.
+echo '<?php echo "STORAGE-PHP-EXECUTED";' > "$fixture/public/storage/shell.php"
+echo '<?php echo "STORAGE-PHP-EXECUTED";' > "$fixture/public/storage/idx/index.php"
+echo 'upload' > "$fixture/public/storage/hello.txt"
 cat > "$fixture/public/index.php" <<'PHP'
 <?php
 echo "VERSION=", PHP_VERSION, "\n";
@@ -111,6 +116,24 @@ check_php "$version" "$loaded"
 
 uid=$(docker exec "$name" id -u)
 [ "$uid" != 0 ] || fail "runs as root"
+
+# PHP under /storage/ never executes, but ordinary files there are still served
+# and other /storage/ URLs still reach the app (Laravel's local-disk serve route).
+code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:$port/storage/shell.php") || true
+[ "$code" = 404 ] || fail "GET /storage/shell.php returned '$code', expected 404"
+code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:$port/storage/shell.php/foo") || true
+[ "$code" = 404 ] || fail "GET /storage/shell.php/foo returned '$code', expected 404"
+# A directory URL makes the server run that directory's index.php.
+for path in /storage/ /storage/idx/; do
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:$port$path") || true
+    [ "$code" = 404 ] || fail "GET $path returned '$code', expected 404 (directory index.php must not run)"
+done
+body=$(curl -fsS --max-time 10 "http://127.0.0.1:$port/storage/hello.txt") \
+    || fail "GET /storage/hello.txt did not return 2xx"
+[ "$body" = upload ] || fail "GET /storage/hello.txt returned '$body', expected the file"
+body=$(curl -fsS --max-time 10 "http://127.0.0.1:$port/storage/private/report.pdf") \
+    || fail "GET /storage/private/report.pdf (no such file) did not reach the app"
+printf '%s\n' "$body" | grep -q '^VERSION=' || fail "a non-file /storage/ URL did not reach the app"
 
 # docker-configure ran at boot and rendered its snippets.
 docker exec "$name" test -f /config/caddy/site.d/00-hardening.caddyfile \

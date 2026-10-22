@@ -47,16 +47,20 @@ The `wordpress` variant sets both lists out of the box (see below).
 
 ## Laravel hardening
 
-The base image ships no no-exec policy, so a `.php` file that lands in a directory the app can write to is executed when requested. For Laravel that directory is `storage`: the Livewire upload vulnerability ([GHSA-29cq-5w36-x7w3](https://github.com/livewire/livewire/security/advisories/GHSA-29cq-5w36-x7w3)) was exploited in the wild by dropping a script there and then requesting `/storage/....php`. Set `PHP_NO_EXEC_PATHS` so nothing under `/storage/` can ever reach the PHP handler:
+Laravel's `storage` directory holds user-controlled files, and the Livewire upload vulnerability ([GHSA-29cq-5w36-x7w3](https://github.com/livewire/livewire/security/advisories/GHSA-29cq-5w36-x7w3)) was exploited in the wild by dropping a `.php` file there and requesting `/storage/....php`. Every frankenphp image therefore refuses, with a 404, any URL under `/storage/` that names a `.php` file (any case such as `shell.PHP`, any depth, with or without trailing path info such as `shell.php/foo`, however the path is encoded) and any directory URL (`/storage/` or `/storage/dir/`), because the server would answer a directory by running its `index.php`. This is on by default; set `PHP_DENY_STORAGE_PHP=off` for an app that really does serve PHP from a `/storage/` URL. The accepted spellings are `off`, `false` and `no` in lower case, upper case or capitalised (`off`, `OFF`, `Off`), and `0`; any other value, including `true`, `1` or a typo, leaves the rule on.
+
+Only those URLs are refused. Everything else under `/storage/` is handled as usual: uploads in `public/storage` are served as static files, and a PHP route at `/storage/{path}` still works, such as Laravel 11+'s local-disk `serve` route for signed `Storage::disk('local')->temporaryUrl()` links.
+
+The rule covers only the URL path `/storage/`. For other directories the app can write to, `PHP_NO_EXEC_PATHS` goes further: nothing under those prefixes can ever reach the PHP handler, so a request for a path with no file behind it gets a 404 rather than falling through to the app (which is why it is not the default for `/storage/`).
 
 ```sh
-docker run -e PHP_NO_EXEC_PATHS="/storage/*" \
+docker run -e PHP_NO_EXEC_PATHS="/uploads/*" \
            -e CADDY_IMMUTABLE_ASSET_PATHS="/build/" \
            -e CADDY_MEDIA_PATHS="/storage/" \
            ghcr.io/aliasproject/php:8.4-frankenphp
 ```
 
-Requests for PHP source under that path (any case, e.g. `shell.PHP`, or with trailing path info, e.g. `shell.php/foo`) never execute: they return 404 or 400, or (with a trailing slash) redirect to a URL that returns 404. Images and other files in the directory are still served, so `public/storage` uploads keep working. The rule covers only the URL path `/storage/`; if the app serves uploads or other writable files from another public path, add it too, space-separated (`PHP_NO_EXEC_PATHS="/storage/* /uploads/*"`). `PHP_NO_EXEC_PATHS` replaces the default rather than appending, so a derived image or `docker run` that sets it must list every path it wants protected.
+Requests for PHP source under a `PHP_NO_EXEC_PATHS` prefix (any case, or with trailing path info) never execute: they return 404 or 400, or (with a trailing slash) redirect to a URL that returns 404. Images and other files in the directory are still served. Add more prefixes space-separated (`PHP_NO_EXEC_PATHS="/uploads/* /files/*"`). `PHP_NO_EXEC_PATHS` replaces the default rather than appending, so a derived image or `docker run` that sets it must list every path it wants protected.
 
 ## WordPress hardening
 
