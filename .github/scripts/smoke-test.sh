@@ -55,8 +55,17 @@ if [ "$variant" = cli ]; then
     uid=$(docker run --rm "$image" id -u) || fail "id did not run"
     [ "$uid" != 0 ] || fail "runs as root"
     # Only cli/Dockerfile.wordpress carries the WORDPRESS_VCS_CHECKOUT prepend
-    # file (see the frankenphp checks below).
-    if docker run --rm "$image" test -f /usr/local/share/php-prepend/wordpress-vcs-checkout.php; then
+    # file (see the frankenphp checks below). CI doesn't build that image, so
+    # this runs only by hand. A docker run that fails fails the check, rather
+    # than reading as "no file".
+    has_vcs=$(docker run --rm "$image" sh -c \
+        'if test -f /usr/local/share/php-prepend/wordpress-vcs-checkout.php; then echo yes; else echo no; fi') \
+        || fail "the WORDPRESS_VCS_CHECKOUT file check did not run"
+    case "$has_vcs" in
+        yes | no) ;;
+        *) fail "the WORDPRESS_VCS_CHECKOUT file check printed '$has_vcs'" ;;
+    esac
+    if [ "$has_vcs" = yes ]; then
         seeded='{"automatic_updates_is_vcs_checkout":{"10":[{"function":"__return_true","accepted_args":1}]}}'
         check='echo "<?php echo isset(\$GLOBALS[\"wp_filter\"]) ? json_encode(\$GLOBALS[\"wp_filter\"]) : \"none\";" > /tmp/vcs.php && php /tmp/vcs.php'
         out=$(docker run --rm "$image" sh -c "$check") || fail "vcs check did not run"
