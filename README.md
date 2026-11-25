@@ -74,3 +74,13 @@ The `frankenphp:wordpress` variant renders a Caddy hardening snippet at containe
 All of the above are overridable via environment variables if a site needs different values.
 
 The `wordpress` variant also ships defaults for the [static asset caching](#static-asset-caching) snippet covering both the Bedrock (`/app/...`, `/wp/...`) and stock (`/wp-content/...`, `/wp-includes/...`) layouts, including cache-plugin output and Avada's compiled `fusion-styles` / `fusion-scripts` directories.
+
+### Auto-updates on sites deployed from git
+
+WordPress skips its background auto-updates (core, plugins, themes and translations) when it finds a `.git`, `.svn`, `.hg` or `.bzr` directory at or above the code it would update, so code deployed from a repository isn't rewritten underneath it. A deploy that keeps the repository outside the folder mounted at `/app` loses that, and WordPress starts updating itself. Set `WORDPRESS_VCS_CHECKOUT=1` to keep it off:
+
+```sh
+docker run -e WORDPRESS_VCS_CHECKOUT=1 ghcr.io/aliasproject/php:8.4-frankenphp-wordpress
+```
+
+It is unset by default, and only the exact value `1` turns it on. The `wordpress` and `wordpress-dev` variants, and an image built from `php/8.4/cli/Dockerfile.wordpress` (so WP-CLI cron runs behave the same), set PHP's `auto_prepend_file` to `/usr/local/share/php-prepend/wordpress-vcs-checkout.php`, a root-owned file that adds `__return_true` to WordPress's `automatic_updates_is_vcs_checkout` filter before WordPress loads (WordPress 4.7 or newer). With the variable unset the file does nothing, and it never affects non-WordPress code. Manual updates from wp-admin or `wp core update` still work. A derived image that sets its own `auto_prepend_file` replaces this one. When `PHP_OPEN_BASEDIR` is set, the frankenphp images add `/usr/local/share/php-prepend/` to it, because PHP refuses every request whose prepend file it can't open.
