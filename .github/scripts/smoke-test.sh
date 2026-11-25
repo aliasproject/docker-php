@@ -54,14 +54,28 @@ if [ "$variant" = cli ]; then
     check_php "$version" "$loaded"
     uid=$(docker run --rm "$image" id -u) || fail "id did not run"
     [ "$uid" != 0 ] || fail "runs as root"
+    # Only cli/Dockerfile.wordpress carries the WORDPRESS_VCS_CHECKOUT prepend
+    # file (see the frankenphp checks below).
+    if docker run --rm "$image" test -f /usr/local/share/php-prepend/wordpress-vcs-checkout.php; then
+        seeded='{"automatic_updates_is_vcs_checkout":{"10":[{"function":"__return_true","accepted_args":1}]}}'
+        check='echo "<?php echo isset(\$GLOBALS[\"wp_filter\"]) ? json_encode(\$GLOBALS[\"wp_filter\"]) : \"none\";" > /tmp/vcs.php && php /tmp/vcs.php'
+        out=$(docker run --rm "$image" sh -c "$check") || fail "vcs check did not run"
+        [ "$out" = none ] || fail "WORDPRESS_VCS_CHECKOUT unset, but the filter was seeded: $out"
+        out=$(docker run --rm -e WORDPRESS_VCS_CHECKOUT=1 "$image" sh -c "$check") || fail "vcs check did not run"
+        [ "$out" = "$seeded" ] || fail "WORDPRESS_VCS_CHECKOUT=1 did not seed the filter: $out"
+    fi
     echo "ok: $image (PHP $version, uid $uid)"
     exit 0
 fi
 
 fixture=$(mktemp -d)
 name="smoke-$$"
+containers=()
 cleanup() {
-    docker rm -f "$name" >/dev/null 2>&1 || true
+    local c
+    for c in "${containers[@]}"; do
+        docker rm -f "$c" >/dev/null 2>&1 || true
+    done
     rm -rf "$fixture"
 }
 trap cleanup EXIT
@@ -80,31 +94,44 @@ echo "VERSION=", PHP_VERSION, "\n";
 echo "SAPI=", php_sapi_name(), "\n";
 echo "EXTENSIONS=", implode(' ', get_loaded_extensions()), "\n";
 PHP
+# What the WORDPRESS_VCS_CHECKOUT prepend file did to this request.
+cat > "$fixture/public/vcs.php" <<'PHP'
+<?php
+echo isset($GLOBALS['wp_filter']) ? json_encode($GLOBALS['wp_filter']) : 'none';
+PHP
 chmod -R a+rX "$fixture"
 
-# Short health interval: the image's own HEALTHCHECK (30s) would make the wait
-# below much longer than it needs to be.
-docker run -d --name "$name" -p 127.0.0.1::80 -v "$fixture:/app:ro" \
-    --health-interval 2s --health-timeout 5s --health-retries 5 --health-start-period 30s \
-    "$image" >/dev/null
+# Boots the image as container $1 (extra docker run arguments after it) with
+# the fixture at /app, waits for it to be healthy and sets $port.
+boot() {
+    local cname=$1 state health=starting
+    shift
+    containers+=("$cname")
+    # Short health interval: the image's own HEALTHCHECK (30s) would make the
+    # wait below much longer than it needs to be.
+    docker run -d --name "$cname" -p 127.0.0.1::80 -v "$fixture:/app:ro" \
+        --health-interval 2s --health-timeout 5s --health-retries 5 --health-start-period 30s \
+        "$@" "$image" >/dev/null
 
-health=starting
-for _ in $(seq 1 60); do
-    state=$(docker inspect -f '{{.State.Status}}' "$name")
-    if [ "$state" != running ]; then
-        docker logs "$name" >&2 || true
-        fail "container is '$state', not running"
+    for _ in $(seq 1 60); do
+        state=$(docker inspect -f '{{.State.Status}}' "$cname")
+        if [ "$state" != running ]; then
+            docker logs "$cname" >&2 || true
+            fail "container is '$state', not running (${*:-no extra arguments})"
+        fi
+        health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cname")
+        [ "$health" = healthy ] && break
+        sleep 2
+    done
+    if [ "$health" != healthy ]; then
+        docker logs "$cname" >&2 || true
+        fail "not healthy after 120s (health: $health; ${*:-no extra arguments})"
     fi
-    health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$name")
-    [ "$health" = healthy ] && break
-    sleep 2
-done
-if [ "$health" != healthy ]; then
-    docker logs "$name" >&2 || true
-    fail "not healthy after 120s (health: $health)"
-fi
 
-port=$(docker port "$name" 80/tcp | head -n1 | sed 's/.*://')
+    port=$(docker port "$cname" 80/tcp | head -n1 | sed 's/.*://')
+}
+
+boot "$name"
 body=$(curl -fsS --max-time 10 "http://127.0.0.1:$port/") \
     || fail "GET / did not return 2xx"
 
@@ -144,4 +171,33 @@ docker exec "$name" test -s /usr/local/etc/php/conf.d/app.ini \
 # Composer is baked into every frankenphp image.
 docker exec "$name" composer --version >/dev/null 2>&1 || fail "composer is not runnable"
 
-echo "ok: $image (PHP $version, uid $uid, healthy)"
+# WORDPRESS_VCS_CHECKOUT (see the frankenphp Dockerfile). Unset, the prepend
+# file does nothing; the exact value 1 seeds WordPress's
+# automatic_updates_is_vcs_checkout filter; with PHP_OPEN_BASEDIR set,
+# docker-configure lets the prepend file in, or every request would fail;
+# with getenv disabled the file must not fatal.
+seeded='{"automatic_updates_is_vcs_checkout":{"10":[{"function":"__return_true","accepted_args":1}]}}'
+docker exec "$name" test -f /usr/local/share/php-prepend/wordpress-vcs-checkout.php \
+    || fail "the WORDPRESS_VCS_CHECKOUT prepend file is missing"
+body=$(curl -fsS --max-time 10 "http://127.0.0.1:$port/vcs.php") \
+    || fail "GET /vcs.php did not return 2xx"
+[ "$body" = none ] || fail "WORDPRESS_VCS_CHECKOUT unset, but the filter was seeded: $body"
+docker rm -f "$name" >/dev/null
+
+vcs_case() { # expected, then extra docker run arguments
+    local expected=$1 cname="$name-vcs-${#containers[@]}"
+    shift
+    boot "$cname" "$@"
+    body=$(curl -fsS --max-time 10 "http://127.0.0.1:$port/vcs.php") \
+        || fail "GET /vcs.php did not return 2xx ($*)"
+    [ "$body" = "$expected" ] || fail "GET /vcs.php returned '$body', expected '$expected' ($*)"
+    body=$(curl -fsS --max-time 10 "http://127.0.0.1:$port/") \
+        || fail "GET / did not return 2xx ($*)"
+    printf '%s\n' "$body" | grep -q '^VERSION=' || fail "GET / did not run the app ($*)"
+    docker rm -f "$cname" >/dev/null
+}
+vcs_case "$seeded" -e WORDPRESS_VCS_CHECKOUT=1
+vcs_case "$seeded" -e WORDPRESS_VCS_CHECKOUT=1 -e PHP_OPEN_BASEDIR=/app:/tmp
+vcs_case none -e WORDPRESS_VCS_CHECKOUT=1 -e PHP_DISABLE_FUNCTIONS=getenv
+
+echo "ok: $image (PHP $version, uid $uid, healthy, WORDPRESS_VCS_CHECKOUT)"

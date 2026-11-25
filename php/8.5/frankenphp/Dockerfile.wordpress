@@ -101,47 +101,4 @@ ENV PHP_OPCACHE_MEMORY=256 \
     PHP_OPCACHE_VALIDATE_TIMESTAMPS=1 \
     PHP_OPCACHE_REVALIDATE_FREQ=60
 
-# ---------------------------------------------------------------------------
-# WORDPRESS_VCS_CHECKOUT (opt-in, unset by default)
-#
-# WordPress skips background auto-updates (core, plugins, themes,
-# translations) when it finds a .git, .svn, .hg or .bzr directory at or above
-# the code it would update, so files deployed from a repository aren't
-# rewritten underneath it. A deploy that keeps the repository outside the
-# served folder loses that. WORDPRESS_VCS_CHECKOUT=1 restores it: the prepend
-# file below seeds WordPress's automatic_updates_is_vcs_checkout filter with
-# __return_true before WordPress loads, and WordPress (4.7+) turns pre-seeded
-# $wp_filter entries into real hooks. Any other value, or unset, does nothing.
-#
-# auto_prepend_file runs before every PHP script in the image, WordPress or
-# not, so the file only touches $GLOBALS['wp_filter'] and only when the
-# variable is "1". It lives outside /app and conf.d, root-owned and read-only
-# to appuser. Every frankenphp Dockerfile.wordpress and
-# php/8.4/cli/Dockerfile.wordpress carry this same block; keep them in sync.
-# ---------------------------------------------------------------------------
-COPY <<'PHP' /usr/local/share/php-prepend/wordpress-vcs-checkout.php
-<?php
-// Prepended to every PHP script by Dockerfile.wordpress; see the comment there.
-if (getenv('WORDPRESS_VCS_CHECKOUT') === '1') {
-    $GLOBALS['wp_filter']['automatic_updates_is_vcs_checkout'][10][] = [
-        'function' => '__return_true',
-        'accepted_args' => 1,
-    ];
-}
-PHP
-
-# There is only one auto_prepend_file. Fail the build if the base ever sets
-# one, rather than silently replacing it (chain to it from the file above if
-# that happens), and fail if PHP doesn't pick up the new setting.
-RUN for bin in "frankenphp php-cli" php; do \
-        $bin -r 'exit(ini_get("auto_prepend_file") === "" ? 0 : 1);' || \
-            { echo "ERROR: base image already sets auto_prepend_file ($bin)" >&2; exit 1; }; \
-    done && \
-    echo 'auto_prepend_file = /usr/local/share/php-prepend/wordpress-vcs-checkout.php' \
-        > "$PHP_INI_DIR/conf.d/wordpress-vcs-checkout.ini" && \
-    for bin in "frankenphp php-cli" php; do \
-        test "$($bin -r 'echo ini_get("auto_prepend_file");')" = /usr/local/share/php-prepend/wordpress-vcs-checkout.php || \
-            { echo "ERROR: auto_prepend_file not picked up ($bin)" >&2; exit 1; }; \
-    done
-
 USER appuser

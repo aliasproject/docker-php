@@ -44,14 +44,11 @@ CADDY_SITE_D=/config/caddy/site.d
     fi
 
     if [ -n "${PHP_OPEN_BASEDIR}" ]; then
-        # Dockerfile.wordpress keeps an auto_prepend_file here. PHP refuses
-        # to run any script whose prepend file is outside open_basedir, so
-        # let it in. The directory is root-owned and holds only that file.
-        if [ -d /usr/local/share/php-prepend ]; then
-            echo "open_basedir = ${PHP_OPEN_BASEDIR}:/usr/local/share/php-prepend/"
-        else
-            echo "open_basedir = ${PHP_OPEN_BASEDIR}"
-        fi
+        # The Dockerfile keeps the WORDPRESS_VCS_CHECKOUT auto_prepend_file
+        # here. PHP refuses to run any script whose prepend file is outside
+        # open_basedir, so let it in. The directory is root-owned and holds
+        # only that file.
+        echo "open_basedir = ${PHP_OPEN_BASEDIR}:/usr/local/share/php-prepend/"
     fi
 } > "${PHP_INI_DIR}/conf.d/app.ini"
 

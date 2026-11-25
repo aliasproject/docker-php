@@ -46,17 +46,22 @@ RUN install-php-extensions \
 # __return_true before WordPress loads, and WordPress (4.7+) turns pre-seeded
 # $wp_filter entries into real hooks. Any other value, or unset, does nothing.
 #
-# auto_prepend_file runs before every PHP script in the image, WordPress or
-# not, so the file only touches $GLOBALS['wp_filter'] and only when the
-# variable is "1". WP-CLI runs (cron among them) can trigger auto-updates
-# too, so the CLI image needs it as well as the web one. It lives outside
-# /app and conf.d, root-owned and read-only to appuser. Every frankenphp
-# Dockerfile.wordpress carries this same block; keep them in sync.
+# WP-CLI runs (cron among them) can trigger auto-updates too, so the CLI
+# image needs it as well as the web one. auto_prepend_file runs before every
+# PHP script, WordPress or not, so the file only touches $GLOBALS['wp_filter']
+# and only when the variable is "1". If getenv is disabled it can't read the
+# variable and does nothing. It lives outside /app and conf.d, root-owned and
+# read-only to appuser. The ini is named 00-* so any later conf.d file (a
+# derived image's wordfence.ini, say) that sets its own auto_prepend_file
+# wins. This image isn't built by build-and-push.yml.
+# php/8.{2,3,4,5}/frankenphp/Dockerfile and php/8.4/cli/Dockerfile.wordpress
+# carry this same block; keep them in sync.
 # ---------------------------------------------------------------------------
 COPY <<'PHP' /usr/local/share/php-prepend/wordpress-vcs-checkout.php
 <?php
-// Prepended to every PHP script by Dockerfile.wordpress; see the comment there.
-if (getenv('WORDPRESS_VCS_CHECKOUT') === '1') {
+// auto_prepend_file (conf.d/00-wordpress-vcs-checkout.ini); see the comment
+// in the Dockerfile that installs it.
+if (function_exists('getenv') && getenv('WORDPRESS_VCS_CHECKOUT') === '1') {
     $GLOBALS['wp_filter']['automatic_updates_is_vcs_checkout'][10][] = [
         'function' => '__return_true',
         'accepted_args' => 1,
@@ -64,14 +69,23 @@ if (getenv('WORDPRESS_VCS_CHECKOUT') === '1') {
 }
 PHP
 
-# There is only one auto_prepend_file. Fail the build if the base ever sets
-# one, rather than silently replacing it (chain to it from the file above if
-# that happens), and fail if PHP doesn't pick up the new setting.
+# There is only one auto_prepend_file. Fail the build if the upstream image
+# ever sets one, rather than silently replacing it (chain to it from the file
+# above if that happens). Then run a real script both ways: the filter is
+# seeded only with the exact value "1".
 RUN php -r 'exit(ini_get("auto_prepend_file") === "" ? 0 : 1);' || \
-        { echo "ERROR: base image already sets auto_prepend_file" >&2; exit 1; } && \
+        { echo "ERROR: upstream image already sets auto_prepend_file" >&2; exit 1; }; \
     echo 'auto_prepend_file = /usr/local/share/php-prepend/wordpress-vcs-checkout.php' \
-        > "$PHP_INI_DIR/conf.d/wordpress-vcs-checkout.ini" && \
-    test "$(php -r 'echo ini_get("auto_prepend_file");')" = /usr/local/share/php-prepend/wordpress-vcs-checkout.php || \
-        { echo "ERROR: auto_prepend_file not picked up" >&2; exit 1; }
+        > "$PHP_INI_DIR/conf.d/00-wordpress-vcs-checkout.ini" && \
+    echo '<?php echo isset($GLOBALS["wp_filter"]) ? json_encode($GLOBALS["wp_filter"]) : "none";' \
+        > /tmp/vcs-check.php && \
+    seeded='{"automatic_updates_is_vcs_checkout":{"10":[{"function":"__return_true","accepted_args":1}]}}' && \
+    test "$(WORDPRESS_VCS_CHECKOUT=1 php /tmp/vcs-check.php)" = "$seeded" || \
+        { echo "ERROR: WORDPRESS_VCS_CHECKOUT=1 did not seed the filter" >&2; exit 1; }; \
+    test "$(WORDPRESS_VCS_CHECKOUT=true php /tmp/vcs-check.php)" = none || \
+        { echo "ERROR: WORDPRESS_VCS_CHECKOUT=true seeded the filter" >&2; exit 1; }; \
+    test "$(env -u WORDPRESS_VCS_CHECKOUT php /tmp/vcs-check.php)" = none || \
+        { echo "ERROR: unset WORDPRESS_VCS_CHECKOUT seeded the filter" >&2; exit 1; }; \
+    rm /tmp/vcs-check.php
 
 USER appuser
