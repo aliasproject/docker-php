@@ -74,3 +74,15 @@ The `frankenphp:wordpress` variant renders a Caddy hardening snippet at containe
 All of the above are overridable via environment variables if a site needs different values.
 
 The `wordpress` variant also ships defaults for the [static asset caching](#static-asset-caching) snippet covering both the Bedrock (`/app/...`, `/wp/...`) and stock (`/wp-content/...`, `/wp-includes/...`) layouts, including cache-plugin output and Avada's compiled `fusion-styles` / `fusion-scripts` directories.
+
+### Auto-updates on sites deployed from git
+
+WordPress skips its background auto-updates (core, plugins, themes and translations) when it finds a `.git`, `.svn`, `.hg` or `.bzr` directory at or above the code it would update, so code deployed from a repository isn't rewritten underneath it. A deploy that keeps the repository outside the folder mounted at `/app` loses that, and WordPress starts updating itself. Set `WORDPRESS_VCS_CHECKOUT=1` to keep it off:
+
+```sh
+docker run -e WORDPRESS_VCS_CHECKOUT=1 ghcr.io/aliasproject/php:8.4-frankenphp-wordpress
+```
+
+It is unset by default, and only the exact value `1` turns it on. Every frankenphp image (base, `dev`, `wordpress` and `wordpress-dev`, so a WordPress site on the base image is covered too) sets PHP's `auto_prepend_file` to `/usr/local/share/php-prepend/wordpress-vcs-checkout.php`, in `php.ini`. The file is root-owned, and adds `__return_true` to WordPress's `automatic_updates_is_vcs_checkout` filter before WordPress loads (WordPress 4.7 or newer). That covers web requests, WP-Cron when a web request runs it, and WP-CLI run with `docker exec` in the frankenphp container (a system cron calling `docker exec <container> php wp-cli.phar cron event run`, for example; the images don't ship WP-CLI itself). Only WP-CLI in a separate CLI container needs the image built from `php/8.4/cli/Dockerfile.wordpress`, which carries the same file; CI doesn't build or publish that image.
+
+With the variable unset the file does nothing. With it set, the only effect on code that isn't WordPress is a global `$wp_filter` array with that one entry. Manual updates from wp-admin or `wp core update` still work. If `getenv` is in `PHP_DISABLE_FUNCTIONS`, the file can't read the variable and does nothing. A derived image that sets its own `auto_prepend_file` (a Wordfence WAF, say) replaces this one, whether it edits the `auto_prepend_file` line in `php.ini`, appends its own line there or adds any `conf.d` file: PHP reads `conf.d` after `php.ini`, and the last setting wins. When `PHP_OPEN_BASEDIR` is set, the frankenphp images add `/usr/local/share/php-prepend/` to it, because PHP refuses every request whose prepend file it can't open. An image that sets `open_basedir` some other way (its own `conf.d` file) has to add that directory itself.

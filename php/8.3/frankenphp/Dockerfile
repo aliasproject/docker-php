@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 ARG FRANKENPHP_VERSION=1.14.0
 ARG PHP_VERSION=8.3
 FROM dunglas/frankenphp:${FRANKENPHP_VERSION}-php${PHP_VERSION}-alpine
@@ -127,6 +128,83 @@ COPY --chmod=755 docker-configure /usr/local/bin/docker-configure
 # composer-managed PHP app (Laravel, Symfony, etc.) needs available when
 # source is deployed without its own Dockerfile.
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+
+# ---------------------------------------------------------------------------
+# WORDPRESS_VCS_CHECKOUT (opt-in, unset by default)
+#
+# WordPress skips background auto-updates (core, plugins, themes,
+# translations) when it finds a .git, .svn, .hg or .bzr directory at or above
+# the code it would update, so files deployed from a repository aren't
+# rewritten underneath it. A deploy that keeps the repository outside the
+# served folder loses that. WORDPRESS_VCS_CHECKOUT=1 restores it: the prepend
+# file below seeds WordPress's automatic_updates_is_vcs_checkout filter with
+# __return_true before WordPress loads, and WordPress (4.7+) turns pre-seeded
+# $wp_filter entries into real hooks. Any other value, or unset, does nothing.
+#
+# It lives here rather than in Dockerfile.wordpress so a WordPress site on
+# this image (framework not flagged) is covered too; every variant inherits
+# it. auto_prepend_file runs before every PHP script, WordPress or not, so
+# the file only touches $GLOBALS['wp_filter'] and only when the variable is
+# "1". If getenv is in PHP_DISABLE_FUNCTIONS it can't read the variable and
+# does nothing. It lives outside /app, and docker-configure adds its
+# directory to PHP_OPEN_BASEDIR.
+#
+# The directive goes in php.ini itself, replacing its "auto_prepend_file ="
+# line in place, not in a conf.d file: PHP reads conf.d after php.ini, so a
+# derived image that sets its own auto_prepend_file (a Wordfence WAF, say),
+# by editing that line, appending one or adding any conf.d file, wins. The
+# prepend file and php.ini are root-owned and read-only to appuser. appuser
+# (group 0) can write conf.d, so it can override this directive there, as it
+# can any other PHP setting.
+#
+# php/8.{2,3,4,5}/frankenphp/Dockerfile and php/8.4/cli/Dockerfile.wordpress
+# carry this same block; keep them in sync.
+# ---------------------------------------------------------------------------
+COPY <<'PHP' /usr/local/share/php-prepend/wordpress-vcs-checkout.php
+<?php
+// auto_prepend_file (set in php.ini); see the comment in the Dockerfile that
+// installs it.
+if (function_exists('getenv') && getenv('WORDPRESS_VCS_CHECKOUT') === '1') {
+    $GLOBALS['wp_filter']['automatic_updates_is_vcs_checkout'][10][] = [
+        'function' => '__return_true',
+        'accepted_args' => 1,
+    ];
+}
+PHP
+
+# There is only one auto_prepend_file. Fail the build if php.ini is missing or
+# the upstream image already sets one, rather than silently replacing it
+# (chain to it from the file above if that happens). Then set it in php.ini
+# and run a real script both ways: the filter is seeded only with the exact
+# value "1".
+RUN ini="$PHP_INI_DIR/php.ini" && \
+    prepend=/usr/local/share/php-prepend/wordpress-vcs-checkout.php && \
+    { test -f "$ini" || { echo "ERROR: $ini is missing" >&2; exit 1; }; } && \
+    for bin in "frankenphp php-cli" php; do \
+        $bin -r 'exit(ini_get("auto_prepend_file") === "" ? 0 : 1);' || \
+            { echo "ERROR: upstream image already sets auto_prepend_file ($bin)" >&2; exit 1; }; \
+    done && \
+    if grep -q '^auto_prepend_file[[:space:]]*=' "$ini"; then \
+        sed -i "s|^auto_prepend_file[[:space:]]*=.*|auto_prepend_file = $prepend|" "$ini"; \
+    else \
+        printf '\nauto_prepend_file = %s\n' "$prepend" >> "$ini"; \
+    fi && \
+    { test "$(grep -c '^auto_prepend_file[[:space:]]*=' "$ini")" = 1 || \
+        { echo "ERROR: $ini should have exactly one auto_prepend_file line" >&2; exit 1; }; } && \
+    echo '<?php echo isset($GLOBALS["wp_filter"]) ? json_encode($GLOBALS["wp_filter"]) : "none";' \
+        > /tmp/vcs-check.php && \
+    seeded='{"automatic_updates_is_vcs_checkout":{"10":[{"function":"__return_true","accepted_args":1}]}}' && \
+    for bin in "frankenphp php-cli" php; do \
+        test "$($bin -r 'echo ini_get("auto_prepend_file");')" = "$prepend" || \
+            { echo "ERROR: auto_prepend_file is not $prepend ($bin)" >&2; exit 1; }; \
+        test "$(WORDPRESS_VCS_CHECKOUT=1 $bin /tmp/vcs-check.php)" = "$seeded" || \
+            { echo "ERROR: WORDPRESS_VCS_CHECKOUT=1 did not seed the filter ($bin)" >&2; exit 1; }; \
+        test "$(WORDPRESS_VCS_CHECKOUT=true $bin /tmp/vcs-check.php)" = none || \
+            { echo "ERROR: WORDPRESS_VCS_CHECKOUT=true seeded the filter ($bin)" >&2; exit 1; }; \
+        test "$(env -u WORDPRESS_VCS_CHECKOUT $bin /tmp/vcs-check.php)" = none || \
+            { echo "ERROR: unset WORDPRESS_VCS_CHECKOUT seeded the filter ($bin)" >&2; exit 1; }; \
+    done && \
+    rm /tmp/vcs-check.php
 
 EXPOSE 80 443 443/udp
 
