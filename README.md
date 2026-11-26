@@ -21,8 +21,9 @@ docker pull ghcr.io/aliasproject/php:8.4-frankenphp
 
 - **cli** — the PHP CLI with unlimited execution time, built on the official `php:<version>-cli-alpine` images, so each rebuild (including the weekly one) picks up the latest php.net patch release. PHP's ini files are in `/usr/local/etc/php` (`conf.d/` for overrides). The versions are identical apart from PHP itself: a minimal extension set (`pdo_mysql`, `bcmath`, `intl`, `pcntl`, `zip`, etc.), a 512M memory limit, and an unprivileged `appuser` in group `0`. Backend and library extensions (`mysqli`, `gd`, `imagick`, `redis`, `igbinary`, …) belong in a derived image such as `php/8.4/cli/Dockerfile.wordpress`.
 - **frankenphp** — FrankenPHP serves PHP directly through Caddy; no separate web server. Minimal extension set, non-root by default, mail sent through `msmtp`, Composer baked in, `HEALTHCHECK` against Caddy's admin API.
-- **frankenphp (dev)** — the FrankenPHP base with extra extensions (`mysqli`, `gd`, `exif`, `imagick`, `redis`, `igbinary`, `soap`) for local development.
-- **frankenphp (wordpress)** — the FrankenPHP base with the same extensions as `dev`, plus a hardening policy suited to running WordPress (see below).
+- **frankenphp (dev)** — the FrankenPHP base set up for local development: the same PHP extensions as the base image (no extras), plus `git` and `npm`, OPcache checking files for changes on every request, and `PHP_DISABLE_FUNCTIONS` cleared so dev tooling can shell out.
+- **frankenphp (wordpress)** — the FrankenPHP base with extra extensions (`mysqli`, `gd`, `exif`, `imagick`, `redis`, `igbinary`, `soap`), plus a hardening policy suited to running WordPress (see below).
+- **frankenphp (wordpress-dev)** — the `wordpress` image with the same local-development changes as `dev`. Use it, not `dev`, for local work that needs the extra extensions.
 
 Every frankenphp image is configurable via environment variables — `PHP_MEMORY_LIMIT`, `PHP_OPCACHE_*`, `PHP_UPLOAD_MAX_FILESIZE`, etc. — see each Dockerfile's `ENV` block for the defaults. The cli images have no such variables; override PHP settings with an ini file in `/usr/local/etc/php/conf.d/` or `php -d`.
 
