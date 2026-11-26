@@ -63,9 +63,13 @@ drun() {
 # other architecture's image, pulled for an earlier run of this script, under
 # the same name. The check_arch below would then fail. A failed pull is fatal
 # unless the image is already present locally (a locally built image that was
-# never pushed, say).
+# never pushed, say). A digest reference always comes from a registry, and the
+# local copy may be the other architecture's, so its pull must succeed.
 if [ -n "$platform" ]; then
     if ! docker pull --quiet --platform "$platform" "$image" >/dev/null; then
+        case "$image" in
+            *@sha256:*) fail "could not pull the $platform image" ;;
+        esac
         docker image inspect "$image" >/dev/null 2>&1 \
             || fail "could not pull the $platform image"
         echo "pull failed; using the local image" >&2
