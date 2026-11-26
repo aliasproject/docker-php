@@ -3,8 +3,9 @@
 # image never gets a floating tag. Run by build-and-push.yml between pushing an
 # image by digest and tagging it; also runnable by hand:
 #
-#   .github/scripts/smoke-test.sh <variant> <image> <php-version>
+#   .github/scripts/smoke-test.sh <variant> <image> <php-version> [<platform>]
 #   .github/scripts/smoke-test.sh wordpress ghcr.io/aliasproject/php:8.4-frankenphp-wordpress 8.4
+#   .github/scripts/smoke-test.sh cli ghcr.io/aliasproject/php:8.4-cli 8.4 linux/arm64
 #
 # variant: cli | base | dev | wordpress | wordpress-dev
 #   cli                      runs php; no server
@@ -12,15 +13,29 @@
 #   wordpress, wordpress-dev Tier 1 plus the WordPress extension set
 # The frankenphp variants are booted and served over HTTP, so the PHP that is
 # checked is the one embedded in the server (not the separate `php` binary).
+# platform (optional, linux/amd64 or linux/arm64) is passed to every docker run
+# as --platform, and the container's architecture is checked against it. Without
+# it, docker runs the image for the host's own architecture. A platform other
+# than the host's needs QEMU (binfmt) set up on the host.
 set -euo pipefail
 
-if [ "$#" -ne 3 ]; then
-    echo "usage: $0 <cli|base|dev|wordpress|wordpress-dev> <image> <php-version>" >&2
+if [ "$#" -lt 3 ] || [ "$#" -gt 4 ]; then
+    echo "usage: $0 <cli|base|dev|wordpress|wordpress-dev> <image> <php-version> [<platform>]" >&2
     exit 2
 fi
 variant=$1
 image=$2
 php_version=$3
+platform=${4:-}
+
+platform_args=()
+expected_arch=
+case "$platform" in
+    "") ;;
+    linux/amd64) platform_args=(--platform "$platform"); expected_arch=x86_64 ;;
+    linux/arm64) platform_args=(--platform "$platform"); expected_arch=aarch64 ;;
+    *) echo "unknown platform: $platform (expected linux/amd64 or linux/arm64)" >&2; exit 2 ;;
+esac
 
 tier1="pdo_mysql zip intl bcmath pcntl posix"
 wordpress_ext="mysqli gd exif imagick redis igbinary soap"
@@ -31,7 +46,22 @@ case "$variant" in
     *) echo "unknown variant: $variant" >&2; exit 2 ;;
 esac
 
-fail() { echo "SMOKE TEST FAILED ($variant, $image): $*" >&2; exit 1; }
+fail() { echo "SMOKE TEST FAILED ($variant, $image${platform:+, $platform}): $*" >&2; exit 1; }
+
+# With a platform, pull that platform's image first. Without this, a docker
+# engine that keeps one image per name (the classic image store) can find the
+# other architecture's image, pulled for an earlier run of this script, under
+# the same name. The check_arch below would then fail. A pull that fails (an
+# image that only exists locally, say) is left to docker run to report.
+if [ -n "$platform" ]; then
+    docker pull --quiet --platform "$platform" "$image" >/dev/null 2>&1 || true
+fi
+
+# uname -m inside the container ($1) against the requested platform.
+check_arch() {
+    [ -n "$expected_arch" ] || return 0
+    [ "$1" = "$expected_arch" ] || fail "architecture is '$1', expected $expected_arch for $platform"
+}
 
 # Shared checks on a PHP version string and a list of loaded extensions.
 check_php() {
@@ -49,16 +79,18 @@ check_php() {
 }
 
 if [ "$variant" = cli ]; then
-    version=$(docker run --rm "$image" php -r 'echo PHP_VERSION;') || fail "php did not run"
-    loaded=$(docker run --rm "$image" php -m | tr '\n' ' ') || fail "php -m did not run"
+    version=$(docker run --rm "${platform_args[@]}" "$image" php -r 'echo PHP_VERSION;') || fail "php did not run"
+    loaded=$(docker run --rm "${platform_args[@]}" "$image" php -m | tr '\n' ' ') || fail "php -m did not run"
     check_php "$version" "$loaded"
-    uid=$(docker run --rm "$image" id -u) || fail "id did not run"
+    uid=$(docker run --rm "${platform_args[@]}" "$image" id -u) || fail "id did not run"
     [ "$uid" != 0 ] || fail "runs as root"
+    arch=$(docker run --rm "${platform_args[@]}" "$image" uname -m) || fail "uname did not run"
+    check_arch "$arch"
     # Only cli/Dockerfile.wordpress carries the WORDPRESS_VCS_CHECKOUT prepend
     # file (see the frankenphp checks below). CI doesn't build that image, so
     # this runs only by hand. A docker run that fails fails the check, rather
     # than reading as "no file".
-    has_vcs=$(docker run --rm "$image" sh -c \
+    has_vcs=$(docker run --rm "${platform_args[@]}" "$image" sh -c \
         'if test -f /usr/local/share/php-prepend/wordpress-vcs-checkout.php; then echo yes; else echo no; fi') \
         || fail "the WORDPRESS_VCS_CHECKOUT file check did not run"
     case "$has_vcs" in
@@ -68,12 +100,12 @@ if [ "$variant" = cli ]; then
     if [ "$has_vcs" = yes ]; then
         seeded='{"automatic_updates_is_vcs_checkout":{"10":[{"function":"__return_true","accepted_args":1}]}}'
         check='echo "<?php echo isset(\$GLOBALS[\"wp_filter\"]) ? json_encode(\$GLOBALS[\"wp_filter\"]) : \"none\";" > /tmp/vcs.php && php /tmp/vcs.php'
-        out=$(docker run --rm "$image" sh -c "$check") || fail "vcs check did not run"
+        out=$(docker run --rm "${platform_args[@]}" "$image" sh -c "$check") || fail "vcs check did not run"
         [ "$out" = none ] || fail "WORDPRESS_VCS_CHECKOUT unset, but the filter was seeded: $out"
-        out=$(docker run --rm -e WORDPRESS_VCS_CHECKOUT=1 "$image" sh -c "$check") || fail "vcs check did not run"
+        out=$(docker run --rm "${platform_args[@]}" -e WORDPRESS_VCS_CHECKOUT=1 "$image" sh -c "$check") || fail "vcs check did not run"
         [ "$out" = "$seeded" ] || fail "WORDPRESS_VCS_CHECKOUT=1 did not seed the filter: $out"
     fi
-    echo "ok: $image (PHP $version, uid $uid)"
+    echo "ok: $image (PHP $version, uid $uid, $arch)"
     exit 0
 fi
 
@@ -120,7 +152,7 @@ boot() {
     # wait below much longer than it needs to be.
     docker run -d --name "$cname" -p 127.0.0.1::80 -v "$fixture:/app:ro" \
         --health-interval 2s --health-timeout 5s --health-retries 5 --health-start-period 30s \
-        "$@" "$image" >/dev/null
+        "${platform_args[@]}" "$@" "$image" >/dev/null
 
     for _ in $(seq 1 60); do
         state=$(docker inspect -f '{{.State.Status}}' "$cname")
@@ -152,6 +184,8 @@ check_php "$version" "$loaded"
 
 uid=$(docker exec "$name" id -u)
 [ "$uid" != 0 ] || fail "runs as root"
+arch=$(docker exec "$name" uname -m) || fail "uname did not run"
+check_arch "$arch"
 
 # PHP under /storage/ never executes, but ordinary files there are still served
 # and other /storage/ URLs still reach the app (Laravel's local-disk serve route).
@@ -209,4 +243,4 @@ vcs_case "$seeded" -e WORDPRESS_VCS_CHECKOUT=1
 vcs_case "$seeded" -e WORDPRESS_VCS_CHECKOUT=1 -e PHP_OPEN_BASEDIR=/app:/tmp
 vcs_case none -e WORDPRESS_VCS_CHECKOUT=1 -e PHP_DISABLE_FUNCTIONS=getenv
 
-echo "ok: $image (PHP $version, uid $uid, healthy, WORDPRESS_VCS_CHECKOUT)"
+echo "ok: $image (PHP $version, uid $uid, $arch, healthy, WORDPRESS_VCS_CHECKOUT)"
