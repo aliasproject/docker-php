@@ -156,8 +156,11 @@ jobs:
       # cli checks are a handful of short `docker run`s with no server or
       # timeouts, far lighter than the emulated extension compile the build
       # step has already survived.
+      # The timeout turns a hung emulated run into a failure in minutes
+      # rather than at the 6-hour job limit.
       - name: Smoke test ${{ matrix.name }} (arm64, QEMU)
         if: ${{ steps.build.outcome == 'success' && contains(matrix.platforms, 'arm64') }}
+        timeout-minutes: 10
         run: |
           tag="${{ matrix.tag }}"
           .github/scripts/smoke-test.sh cli \

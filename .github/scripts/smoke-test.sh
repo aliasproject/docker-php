@@ -28,12 +28,11 @@ image=$2
 php_version=$3
 platform=${4:-}
 
-platform_args=()
 expected_arch=
 case "$platform" in
     "") ;;
-    linux/amd64) platform_args=(--platform "$platform"); expected_arch=x86_64 ;;
-    linux/arm64) platform_args=(--platform "$platform"); expected_arch=aarch64 ;;
+    linux/amd64) expected_arch=x86_64 ;;
+    linux/arm64) expected_arch=aarch64 ;;
     *) echo "unknown platform: $platform (expected linux/amd64 or linux/arm64)" >&2; exit 2 ;;
 esac
 
@@ -48,13 +47,29 @@ esac
 
 fail() { echo "SMOKE TEST FAILED ($variant, $image${platform:+, $platform}): $*" >&2; exit 1; }
 
+# docker run, with --platform when a platform was given. A function rather
+# than an array of extra arguments: bash before 4.4 (macOS's /bin/bash) treats
+# an empty array as unset under set -u.
+drun() {
+    if [ -n "$platform" ]; then
+        docker run --platform "$platform" "$@"
+    else
+        docker run "$@"
+    fi
+}
+
 # With a platform, pull that platform's image first. Without this, a docker
 # engine that keeps one image per name (the classic image store) can find the
 # other architecture's image, pulled for an earlier run of this script, under
-# the same name. The check_arch below would then fail. A pull that fails (an
-# image that only exists locally, say) is left to docker run to report.
+# the same name. The check_arch below would then fail. A failed pull is fatal
+# unless the image is already present locally (a locally built image that was
+# never pushed, say).
 if [ -n "$platform" ]; then
-    docker pull --quiet --platform "$platform" "$image" >/dev/null 2>&1 || true
+    if ! docker pull --quiet --platform "$platform" "$image" >/dev/null; then
+        docker image inspect "$image" >/dev/null 2>&1 \
+            || fail "could not pull the $platform image"
+        echo "pull failed; using the local image" >&2
+    fi
 fi
 
 # uname -m inside the container ($1) against the requested platform.
@@ -79,18 +94,18 @@ check_php() {
 }
 
 if [ "$variant" = cli ]; then
-    version=$(docker run --rm "${platform_args[@]}" "$image" php -r 'echo PHP_VERSION;') || fail "php did not run"
-    loaded=$(docker run --rm "${platform_args[@]}" "$image" php -m | tr '\n' ' ') || fail "php -m did not run"
+    version=$(drun --rm "$image" php -r 'echo PHP_VERSION;') || fail "php did not run"
+    loaded=$(drun --rm "$image" php -m | tr '\n' ' ') || fail "php -m did not run"
     check_php "$version" "$loaded"
-    uid=$(docker run --rm "${platform_args[@]}" "$image" id -u) || fail "id did not run"
+    uid=$(drun --rm "$image" id -u) || fail "id did not run"
     [ "$uid" != 0 ] || fail "runs as root"
-    arch=$(docker run --rm "${platform_args[@]}" "$image" uname -m) || fail "uname did not run"
+    arch=$(drun --rm "$image" uname -m) || fail "uname did not run"
     check_arch "$arch"
     # Only cli/Dockerfile.wordpress carries the WORDPRESS_VCS_CHECKOUT prepend
     # file (see the frankenphp checks below). CI doesn't build that image, so
     # this runs only by hand. A docker run that fails fails the check, rather
     # than reading as "no file".
-    has_vcs=$(docker run --rm "${platform_args[@]}" "$image" sh -c \
+    has_vcs=$(drun --rm "$image" sh -c \
         'if test -f /usr/local/share/php-prepend/wordpress-vcs-checkout.php; then echo yes; else echo no; fi') \
         || fail "the WORDPRESS_VCS_CHECKOUT file check did not run"
     case "$has_vcs" in
@@ -100,9 +115,9 @@ if [ "$variant" = cli ]; then
     if [ "$has_vcs" = yes ]; then
         seeded='{"automatic_updates_is_vcs_checkout":{"10":[{"function":"__return_true","accepted_args":1}]}}'
         check='echo "<?php echo isset(\$GLOBALS[\"wp_filter\"]) ? json_encode(\$GLOBALS[\"wp_filter\"]) : \"none\";" > /tmp/vcs.php && php /tmp/vcs.php'
-        out=$(docker run --rm "${platform_args[@]}" "$image" sh -c "$check") || fail "vcs check did not run"
+        out=$(drun --rm "$image" sh -c "$check") || fail "vcs check did not run"
         [ "$out" = none ] || fail "WORDPRESS_VCS_CHECKOUT unset, but the filter was seeded: $out"
-        out=$(docker run --rm "${platform_args[@]}" -e WORDPRESS_VCS_CHECKOUT=1 "$image" sh -c "$check") || fail "vcs check did not run"
+        out=$(drun --rm -e WORDPRESS_VCS_CHECKOUT=1 "$image" sh -c "$check") || fail "vcs check did not run"
         [ "$out" = "$seeded" ] || fail "WORDPRESS_VCS_CHECKOUT=1 did not seed the filter: $out"
     fi
     echo "ok: $image (PHP $version, uid $uid, $arch)"
@@ -150,9 +165,9 @@ boot() {
     containers+=("$cname")
     # Short health interval: the image's own HEALTHCHECK (30s) would make the
     # wait below much longer than it needs to be.
-    docker run -d --name "$cname" -p 127.0.0.1::80 -v "$fixture:/app:ro" \
+    drun -d --name "$cname" -p 127.0.0.1::80 -v "$fixture:/app:ro" \
         --health-interval 2s --health-timeout 5s --health-retries 5 --health-start-period 30s \
-        "${platform_args[@]}" "$@" "$image" >/dev/null
+        "$@" "$image" >/dev/null
 
     for _ in $(seq 1 60); do
         state=$(docker inspect -f '{{.State.Status}}' "$cname")
