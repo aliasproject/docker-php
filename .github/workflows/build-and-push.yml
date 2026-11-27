@@ -144,13 +144,28 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
-      - name: Smoke test ${{ matrix.name }}
+      - name: Smoke test ${{ matrix.name }} (amd64)
         if: ${{ steps.build.outcome == 'success' }}
         run: |
           tag="${{ matrix.tag }}"
           .github/scripts/smoke-test.sh cli \
             "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}" \
-            "${tag%%-*}"
+            "${tag%%-*}" linux/amd64
+
+      # The arm64 image runs under the QEMU set up above for the build. The
+      # cli checks are a handful of short `docker run`s with no server or
+      # timeouts, far lighter than the emulated extension compile the build
+      # step has already survived.
+      # The timeout turns a hung emulated run into a failure in minutes
+      # rather than at the 6-hour job limit.
+      - name: Smoke test ${{ matrix.name }} (arm64, QEMU)
+        if: ${{ steps.build.outcome == 'success' && contains(matrix.platforms, 'arm64') }}
+        timeout-minutes: 10
+        run: |
+          tag="${{ matrix.tag }}"
+          .github/scripts/smoke-test.sh cli \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}" \
+            "${tag%%-*}" linux/arm64
 
       - name: Tag ${{ matrix.name }}
         if: ${{ steps.build.outcome == 'success' }}
@@ -218,6 +233,17 @@ jobs:
           cache-from: type=gha,scope=8.${{ matrix.version }}-frankenphp-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=8.${{ matrix.version }}-frankenphp-${{ matrix.arch }}
 
+      # Boot the arm64 image here, on the native arm64 runner that built it,
+      # before its digest is uploaded: the merge job runs on amd64 and boots
+      # only the amd64 image. A failure leaves no arm64 digest, so the merge
+      # job fails at its download and the floating tags stay where they were.
+      - name: Smoke test (arm64)
+        if: ${{ matrix.arch == 'arm64' && steps.build.outcome == 'success' }}
+        run: |
+          .github/scripts/smoke-test.sh base \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}" \
+            "${{ matrix.version }}" linux/arm64
+
       - name: Export digest
         if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         run: |
@@ -283,9 +309,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Boot the amd64 image (the runner's own architecture) before it gets
-      # any tag. A failure here leaves the existing floating tags untouched,
-      # and holds back the images built FROM this one (their jobs need this
-      # one to succeed).
+      # any tag; the arm64 image was booted in its build leg. A failure here
+      # leaves the existing floating tags untouched, and holds back the images
+      # built FROM this one (their jobs need this one to succeed).
       - name: Checkout smoke test script
         if: ${{ steps.digest_amd64.outcome == 'success' }}
         uses: actions/checkout@v7
@@ -297,7 +323,7 @@ jobs:
         run: |
           .github/scripts/smoke-test.sh "base" \
             "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:$(find /tmp/digests/amd64 -type f -printf '%f')" \
-            "${{ matrix.version }}"
+            "${{ matrix.version }}" linux/amd64
 
       - name: Create manifest list and push
         if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
@@ -396,6 +422,17 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.version }}-frankenphp-${{ matrix.variant }}-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.version }}-frankenphp-${{ matrix.variant }}-${{ matrix.arch }}
 
+      # Boot the arm64 image here, on the native arm64 runner that built it,
+      # before its digest is uploaded: the merge job runs on amd64 and boots
+      # only the amd64 image. A failure leaves no arm64 digest, so the merge
+      # job fails at its download and the floating tags stay where they were.
+      - name: Smoke test (arm64)
+        if: ${{ matrix.arch == 'arm64' && steps.build.outcome == 'success' }}
+        run: |
+          .github/scripts/smoke-test.sh "${{ matrix.variant }}" \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}" \
+            "${{ matrix.version }}" linux/arm64
+
       - name: Export digest
         if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         run: |
@@ -463,9 +500,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Boot the amd64 image (the runner's own architecture) before it gets
-      # any tag. A failure here leaves the existing floating tags untouched,
-      # and holds back the images built FROM this one (their jobs need this
-      # one to succeed).
+      # any tag; the arm64 image was booted in its build leg. A failure here
+      # leaves the existing floating tags untouched, and holds back the images
+      # built FROM this one (their jobs need this one to succeed).
       - name: Checkout smoke test script
         if: ${{ steps.digest_amd64.outcome == 'success' }}
         uses: actions/checkout@v7
@@ -477,7 +514,7 @@ jobs:
         run: |
           .github/scripts/smoke-test.sh "${{ matrix.variant }}" \
             "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:$(find /tmp/digests/amd64 -type f -printf '%f')" \
-            "${{ matrix.version }}"
+            "${{ matrix.version }}" linux/amd64
 
       - name: Create manifest list and push
         if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
@@ -562,6 +599,17 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.version }}-frankenphp-${{ matrix.variant }}-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.version }}-frankenphp-${{ matrix.variant }}-${{ matrix.arch }}
 
+      # Boot the arm64 image here, on the native arm64 runner that built it,
+      # before its digest is uploaded: the merge job runs on amd64 and boots
+      # only the amd64 image. A failure leaves no arm64 digest, so the merge
+      # job fails at its download and the floating tags stay where they were.
+      - name: Smoke test (arm64)
+        if: ${{ matrix.arch == 'arm64' && steps.build.outcome == 'success' }}
+        run: |
+          .github/scripts/smoke-test.sh "${{ matrix.variant }}" \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}" \
+            "${{ matrix.version }}" linux/arm64
+
       - name: Export digest
         if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/{1}', matrix.version, matrix.file)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
         run: |
@@ -624,7 +672,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Boot the amd64 image (the runner's own architecture) before it gets
-      # any tag. A failure here leaves the existing floating tags untouched.
+      # any tag; the arm64 image was booted in its build leg. A failure here
+      # leaves the existing floating tags untouched.
       - name: Checkout smoke test script
         if: ${{ steps.digest_amd64.outcome == 'success' }}
         uses: actions/checkout@v7
@@ -636,7 +685,7 @@ jobs:
         run: |
           .github/scripts/smoke-test.sh "${{ matrix.variant }}" \
             "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:$(find /tmp/digests/amd64 -type f -printf '%f')" \
-            "${{ matrix.version }}"
+            "${{ matrix.version }}" linux/amd64
 
       - name: Create manifest list and push
         if: ${{ inputs.force_build_all || github.event_name == 'schedule' || inputs[matrix.force_input] || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile.{1}', matrix.version, matrix.variant)) || (contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/Dockerfile', matrix.version)) || contains(needs.detect-changes.outputs.changed_files, format('php/{0}/frankenphp/docker-configure', matrix.version))) }}
